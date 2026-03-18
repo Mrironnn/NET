@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NET</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --panel: #141414;
+            --accent: #0078d4;
+            --text: #e0e0e0;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .auth-box {
+            background: var(--panel);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid #333;
+            width: 320px;
+            text-align: center;
+        }
+
+        #main-app {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: var(--panel);
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background: #080808;
+            visibility: hidden;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #222;
+            font-weight: bold;
+            font-size: 1.1em;
+            letter-spacing: 1px;
+        }
+
+        .net-logo {
+            font-size: 1.5em;
+            font-weight: 900;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+            .net-logo span {
+                color: var(--accent);
+            }
+
+        #messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+        }
+
+        .msg {
+            background: #1a1a1a;
+            padding: 10px 15px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+            max-width: 70%;
+            border: 1px solid #222;
+            word-wrap: break-word;
+        }
+
+        .my-msg {
+            align-self: flex-end;
+            border-right: 3px solid var(--accent);
+            background: #1e1e1e;
+        }
+
+        .input-box {
+            padding: 20px;
+            background: var(--panel);
+            display: flex;
+            gap: 10px;
+            border-top: 1px solid #222;
+            align-items: center;
+        }
+
+        input[type="text"], input[type="email"], input[type="password"] {
+            background: #222;
+            border: 1px solid #333;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            flex-grow: 1;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+            button:hover {
+                background: #005a9e;
+            }
+
+        .user-item {
+            padding: 15px;
+            border-bottom: 1px solid #222;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .user-item:hover {
+                background: #1e1e1e;
+            }
+
+        .avatar-circle {
+            width: 35px;
+            height: 35px;
+            background: #333;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+        }
+
+        .code-section {
+            padding: 15px;
+            border-bottom: 1px solid #222;
+            background: #0f0f0f;
+        }
+
+        .code-display {
+            font-size: 1.2em;
+            color: var(--accent);
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="auth-modal" class="modal">
+        <div class="auth-box">
+            <div class="net-logo">N<span>E</span>T</div>
+            <h2 id="auth-title">Вход</h2>
+            <input type="email" id="email" placeholder="Email"><br><br>
+            <input type="password" id="pass" placeholder="Пароль"><br><br>
+            <button onclick="handleAuth()" id="auth-btn" style="width:100%">Войти</button>
+            <p style="font-size: 0.8em; margin-top: 15px; cursor: pointer; color: #888;" onclick="toggleAuth()">Нет аккаунта? Регистрация</p>
+        </div>
+    </div>
+
+    <div id="name-modal" class="modal" style="display: none;">
+        <div class="auth-box">
+            <h2>Как тебя зовут?</h2>
+            <input type="text" id="new-name" placeholder="Твой ник"><br><br>
+            <button onclick="saveName()" style="width:100%">Начать</button>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <div class="sidebar">
+            <div class="header">NET</div>
+            <div class="code-section">
+                Ваш код: <span class="code-display" id="my-code-display">...</span>
+                <div style="display:flex; gap:5px; margin-top:10px;">
+                    <input type="text" id="friend-code" placeholder="Код друга" maxlength="6" style="margin-bottom:0">
+                    <button onclick="addFriend()">+</button>
+                </div>
+            </div>
+            <div id="user-list"></div>
+        </div>
+
+        <div class="chat-area" id="chat-area">
+            <div class="header" id="chat-with">Чат</div>
+            <ul id="messages"></ul>
+            <div class="input-box">
+                <input type="file" id="file-input" style="display:none" onchange="uploadPhoto()" accept="image/*">
+                <button onclick="document.getElementById('file-input').click()" style="background: #333; padding: 10px 15px;">📎</button>
+
+                <input type="text" id="msg-input" placeholder="Сообщение...">
+                <button onclick="send()" style="padding: 10px 20px;">Отправить</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myId, myName, myCode, currentChatId = null;
+
+        function toggleAuth() {
+            const t = document.getElementById('auth-title');
+            const b = document.getElementById('auth-btn');
+            const isLogin = t.innerText === "Вход";
+            t.innerText = isLogin ? "Регистрация" : "Вход";
+            b.innerText = isLogin ? "Создать аккаунт" : "Войти";
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('pass').value;
+            const isReg = document.getElementById('auth-title').innerText === "Регистрация";
+            const res = await fetch(isReg ? '/register' : '/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                myId = data.id; myCode = data.code;
+                document.getElementById('my-code-display').innerText = myCode;
+                document.getElementById('auth-modal').style.display = 'none';
+                if (isReg) document.getElementById('name-modal').style.display = 'flex';
+                else { myName = data.name; startApp(); }
+            } else alert(data.error);
+        }
+
+        async function saveName() {
+            myName = document.getElementById('new-name').value || "User";
+            await fetch('/update-name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: myId, name: myName })
+            });
+            document.getElementById('name-modal').style.display = 'none';
+            startApp();
+        }
+
+        function startApp() {
+            document.getElementById('main-app').style.display = 'flex';
+            loadContacts();
+        }
+
+        async function loadContacts() {
+            const res = await fetch(`/contacts?userId=${myId}`);
+            const users = await res.json();
+            const list = document.getElementById('user-list');
+            list.innerHTML = '';
+            users.forEach(u => {
+                const el = document.createElement('div');
+                el.className = 'user-item';
+                el.innerHTML = `<div class="avatar-circle">${u.name[0].toUpperCase()}</div> ${u.name}`;
+                el.onclick = () => selectChat(u.id, u.name);
+                list.appendChild(el);
+            });
+        }
+
+        async function addFriend() {
+            const code = document.getElementById('friend-code').value.toUpperCase();
+            const res = await fetch('/add-contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myId, code })
+            });
+            if (res.ok) { document.getElementById('friend-code').value = ''; loadContacts(); }
+            else { const err = await res.json(); alert(err.error); }
+        }
+
+        async function selectChat(id, name) {
+            currentChatId = id;
+            document.getElementById('chat-with').innerText = name;
+            document.getElementById('chat-area').style.visibility = 'visible';
+            const ul = document.getElementById('messages');
+            ul.innerHTML = '';
+            const res = await fetch(`/messages?u1=${myId}&u2=${id}`);
+            const history = await res.json();
+            history.forEach(msg => {
+                renderMessage({ userId: msg.sender_id, user: (msg.sender_id === myId ? myName : name), text: msg.text, type: msg.type });
+            });
+        }
+
+        function send() {
+            const input = document.getElementById('msg-input');
+            if (input.value && currentChatId) {
+                socket.emit('chat message', { userId: myId, user: myName, toId: currentChatId, text: input.value, type: 'text' });
+                input.value = '';
+            }
+        }
+
+        async function uploadPhoto() {
+            const fileInput = document.getElementById('file-input');
+            if (!fileInput.files[0]) return;
+            const formData = new FormData();
+            formData.append('photo', fileInput.files[0]);
+
+            // Временный текст пока фото грузится (опционально)
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.url) {
+                socket.emit('chat message', { userId: myId, user: myName, toId: currentChatId, text: data.url, type: 'image' });
+            } else {
+                alert("Ошибка загрузки фото!");
+            }
+            fileInput.value = ''; // Сбрасываем инпут
+        }
+
+        function renderMessage(data) {
+            const li = document.createElement('li');
+            li.className = `msg ${data.userId === myId ? 'my-msg' : ''}`;
+            if (data.type === 'image') {
+                li.innerHTML = `<strong>${data.user}</strong><br><img src="${data.text}" style="max-width:100%; border-radius:10px; margin-top:5px; display:block;">`;
+            } else {
+                li.innerHTML = `<strong>${data.user}</strong><br>${data.text}`;
+            }
+            document.getElementById('messages').appendChild(li);
+            const obj = document.getElementById('messages');
+            obj.scrollTop = obj.scrollHeight;
+        }
+
+        document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
+
+        socket.on('chat message', (data) => {
+            if (data.toId === currentChatId || (data.toId === myId && data.userId === currentChatId)) {
+                renderMessage(data);
+            }
+        });
+    </script>
+</body>
+</html>
