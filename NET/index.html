@@ -17,9 +17,12 @@
             color: var(--text);
             font-family: 'Segoe UI', sans-serif;
             display: flex;
-            height: 100vh;
+            height: 100dvh;
             overflow: hidden;
+            flex-direction: column;
         }
+
+
 
         .modal {
             position: fixed;
@@ -63,6 +66,7 @@
             flex-direction: column;
             background: #080808;
             visibility: hidden;
+            height: 100dvh;
         }
 
         .header {
@@ -117,6 +121,8 @@
             gap: 10px;
             border-top: 1px solid #222;
             align-items: center;
+            flex-shrink: 0;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
         }
 
         input[type="text"], input[type="email"], input[type="password"] {
@@ -515,23 +521,49 @@
 
         document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
 
+        // 1. В самом начале скрипта (вне socket.on) создай объект звука
+        const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); // Можно заменить на свой файл
+
         socket.on('chat message', (data) => {
-            // Если мы сейчас находимся в чате с этим человеком
-            if (data.toId === currentChatId || (data.toId === myId && data.userId === currentChatId)) {
+            // Определяем, открыт ли сейчас этот чат
+            const isCurrentChat = data.toId === currentChatId || (data.toId === myId && data.userId === currentChatId);
+
+            if (isCurrentChat) {
                 renderMessage(data);
             }
-            // Если сообщение пришло НАМ, но мы в другом чате или смотрим меню
-            else if (data.toId === myId) {
-                const msgSnippet = data.type === 'image' ? '📸 Фотография' : data.text;
 
-                // Внутрисайтовое плавное уведомление
-                showToast(data.user, msgSnippet);
+            // ЛОГИКА УВЕДОМЛЕНИЙ
+            // Уведомление нужно, если: вкладка скрыта ИЛИ мы в другом чате
+            if (document.hidden || !isCurrentChat) {
 
-                // Если вкладка свернута или мы в другом окне — шлем системное Push-уведомление
+                // Звук (сработает, если вкладка скрыта)
+                if (document.hidden) {
+                    notifySound.play().catch(e => console.log("Звук заблокирован браузером"));
+                }
+
+                const msgSnippet = data.type === 'image' ? '🖼️ Фотография' : data.text;
+
+                // 2. Внутрисайтовое уведомление (Toast) показываем, только если мы не в этом чате
+                if (!isCurrentChat) {
+                    showToast(data.user, msgSnippet);
+                }
+
+                // 3. Системное уведомление (для свернутого браузера)
                 if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                    new Notification(`Новое сообщение от ${data.user}`, {
-                        body: msgSnippet
+                    const notif = new Notification(`Новое сообщение от ${data.user}`, {
+                        body: msgSnippet,
+                        tag: 'chat-notification', // Исправляет баг: новые сообщения будут заменять старые, а не спамить
+                        icon: '/favicon.ico'      // Можно добавить иконку сайта
                     });
+
+                    // Закрываем через 5 секунд, чтобы не висело вечно
+                    setTimeout(() => notif.close(), 5000);
+
+                    // При клике на уведомление — перекидываем пользователя на вкладку
+                    notif.onclick = () => {
+                        window.focus();
+                        notif.close();
+                    };
                 }
             }
         });
