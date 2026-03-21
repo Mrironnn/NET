@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NET</title>
     <style>
         :root {
@@ -180,10 +181,84 @@
             font-weight: bold;
             letter-spacing: 2px;
         }
+        /* --- СТИЛИ ДЛЯ УВЕДОМЛЕНИЙ --- */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: var(--panel);
+            border-left: 4px solid var(--accent);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s ease;
+            min-width: 200px;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .back-btn {
+            display: none;
+            cursor: pointer;
+            margin-right: 15px;
+            font-size: 1.2em;
+        }
+
+        /* --- АДАПТИВНОСТЬ ПОД МОБИЛЬНЫЕ УСТРОЙСТВА --- */
+        @media (max-width: 768px) {
+            #main-app {
+                position: relative;
+            }
+            .sidebar {
+                width: 100%;
+                border-right: none;
+            }
+            .chat-area {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 10;
+                background: var(--bg);
+                /* Чат скрыт, пока мы не нажмем на контакт */
+            }
+            .back-btn {
+                display: inline-block; /* Показываем кнопку "Назад" на телефоне */
+            }
+            #toast-container {
+                bottom: auto;
+                top: 10px; /* На телефоне уведомления лучше показывать сверху */
+                right: 10px;
+                left: 10px;
+            }
+            .toast {
+                max-width: unset;
+                width: calc(100% - 40px);
+            }
+            .auth-box {
+                width: 85%;
+            }
+        }
     </style>
 </head>
 <body>
-
+    <div id="toast-container"></div>
     <div id="auth-modal" class="modal">
         <div class="auth-box">
             <div class="net-logo">N<span>E</span>T</div>
@@ -234,6 +309,30 @@
         const socket = io();
         let myId, myName, myCode, currentChatId = null;
 
+        // --- НОВОЕ: Проверяем память браузера при перезагрузке (F5) ---
+        window.onload = async () => {
+            const savedSession = localStorage.getItem('net_session');
+            if (savedSession) {
+                const data = JSON.parse(savedSession);
+
+                // Спрашиваем сервер: "Ты меня помнишь?"
+                const res = await fetch(`/validate-session?id=${data.id}`);
+                const status = await res.json();
+
+                if (status.valid) {
+                    myId = data.id;
+                    myName = data.name;
+                    myCode = data.code;
+                    document.getElementById('my-code-display').innerText = myCode;
+                    document.getElementById('auth-modal').style.display = 'none';
+                    startApp();
+                } else {
+                    // Если база удалена или юзера нет — чистим память и на вход
+                    localStorage.removeItem('net_session');
+                }
+            }
+        };
+
         function toggleAuth() {
             const t = document.getElementById('auth-title');
             const b = document.getElementById('auth-btn');
@@ -257,7 +356,12 @@
                 document.getElementById('my-code-display').innerText = myCode;
                 document.getElementById('auth-modal').style.display = 'none';
                 if (isReg) document.getElementById('name-modal').style.display = 'flex';
-                else { myName = data.name; startApp(); }
+                else {
+                    myName = data.name;
+                    // --- НОВОЕ: Запоминаем данные при входе ---
+                    localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
+                    startApp();
+                }
             } else alert(data.error);
         }
 
@@ -268,13 +372,21 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: myId, name: myName })
             });
+            // --- НОВОЕ: Запоминаем данные при регистрации ---
+            localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
             document.getElementById('name-modal').style.display = 'none';
             startApp();
         }
 
         function startApp() {
             document.getElementById('main-app').style.display = 'flex';
+            socket.emit('join', myId);
             loadContacts();
+
+            // Запрашиваем системные уведомления (браузер сам спросит пользователя)
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
         }
 
         async function loadContacts() {
@@ -304,7 +416,8 @@
 
         async function selectChat(id, name) {
             currentChatId = id;
-            document.getElementById('chat-with').innerText = name;
+            // Добавили кнопку назад прямо в заголовок
+            document.getElementById('chat-with').innerHTML = `<span class="back-btn" onclick="closeMobileChat()">⬅️</span> ${name}`;
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
             ul.innerHTML = '';
@@ -313,6 +426,53 @@
             history.forEach(msg => {
                 renderMessage({ userId: msg.sender_id, user: (msg.sender_id === myId ? myName : name), text: msg.text, type: msg.type });
             });
+        }
+
+        // --- ЛОГИКА ОЧЕРЕДИ УВЕДОМЛЕНИЙ ---
+        let toastQueue = [];
+        let isToastProcessing = false;
+
+        function showToast(title, text) {
+            toastQueue.push({ title, text });
+            if (!isToastProcessing) processToastQueue();
+        }
+
+        function processToastQueue() {
+            if (toastQueue.length === 0) {
+                isToastProcessing = false;
+                return;
+            }
+            isToastProcessing = true;
+
+            const data = toastQueue.shift();
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<strong>${data.title}</strong><br><span style="font-size: 0.9em; color: #ccc;">${data.text}</span>`;
+
+            container.appendChild(toast);
+
+            // Плавное появление
+            setTimeout(() => toast.classList.add('show'), 50);
+
+            // Удаление через 3 секунды
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400); // ждем конец анимации
+            }, 3000);
+
+            // Запускаем следующее уведомление ровно через 1.5 секунды
+            if (toastQueue.length > 0) {
+                setTimeout(processToastQueue, 1500);
+            } else {
+                setTimeout(() => { isToastProcessing = false; }, 1500);
+            }
+        }
+
+        // --- КНОПКА "НАЗАД" ДЛЯ МОБИЛОК ---
+        function closeMobileChat() {
+            document.getElementById('chat-area').style.visibility = 'hidden';
+            currentChatId = null;
         }
 
         function send() {
@@ -356,9 +516,28 @@
         document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
 
         socket.on('chat message', (data) => {
+            // Если мы сейчас находимся в чате с этим человеком
             if (data.toId === currentChatId || (data.toId === myId && data.userId === currentChatId)) {
                 renderMessage(data);
             }
+            // Если сообщение пришло НАМ, но мы в другом чате или смотрим меню
+            else if (data.toId === myId) {
+                const msgSnippet = data.type === 'image' ? '📸 Фотография' : data.text;
+
+                // Внутрисайтовое плавное уведомление
+                showToast(data.user, msgSnippet);
+
+                // Если вкладка свернута или мы в другом окне — шлем системное Push-уведомление
+                if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                    new Notification(`Новое сообщение от ${data.user}`, {
+                        body: msgSnippet
+                    });
+                }
+            }
+        });
+        // --- НОВОЕ: Слушаем сигнал от сервера о новом контакте ---
+        socket.on('contact added', () => {
+            loadContacts(); // Как только кто-то добавил нас, тихо и без перезагрузки обновляем список слева
         });
     </script>
 </body>

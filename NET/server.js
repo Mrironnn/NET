@@ -70,6 +70,14 @@ app.post('/login', async (req, res) => {
     });
 });
 
+// Проверка: существует ли еще пользователь в базе
+app.get('/validate-session', (req, res) => {
+    db.get("SELECT id FROM users WHERE id = ?", [req.query.id], (err, user) => {
+        if (user) res.json({ valid: true });
+        else res.json({ valid: false });
+    });
+});
+
 app.post('/update-name', (req, res) => {
     db.run("UPDATE users SET name = ? WHERE id = ?", [req.body.name, req.body.id], () => res.json({ success: true }));
 });
@@ -82,7 +90,11 @@ app.post('/add-contact', (req, res) => {
 
         db.get("SELECT * FROM contacts WHERE user_id = ? AND contact_id = ?", [userId, friend.id], (err, existing) => {
             if (existing) return res.status(400).json({ error: "Пользователь уже в контактах" });
+
             db.run("INSERT INTO contacts (user_id, contact_id) VALUES (?, ?), (?, ?)", [userId, friend.id, friend.id, userId], () => {
+                // --- НОВОЕ: Мгновенно сообщаем другу, что его кто-то добавил ---
+                io.to(String(friend.id)).emit('contact added');
+
                 res.json({ success: true });
             });
         });
@@ -104,6 +116,11 @@ app.get('/messages', (req, res) => {
 
 // --- SOCKET.IO ---
 io.on('connection', (socket) => {
+    // 1. Когда пользователь входит, сажаем его в персональную комнату по его ID
+    socket.on('join', (userId) => {
+        socket.join(String(userId));
+    });
+
     socket.on('chat message', (data) => {
         if (!data.userId || !data.toId) return;
 
@@ -115,7 +132,8 @@ io.on('connection', (socket) => {
             if (err) {
                 console.error("Ошибка сохранения сообщения:", err);
             } else {
-                io.emit('chat message', data); // Отправляем обоим только если сохранилось
+                // 2. ИСПРАВЛЕНИЕ: Отправляем сообщение ТОЛЬКО в комнаты отправителя и получателя
+                io.to(String(data.userId)).to(String(data.toId)).emit('chat message', data);
             }
         });
     });
