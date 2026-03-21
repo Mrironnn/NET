@@ -400,17 +400,19 @@
                 const res = await fetch(`/contacts?userId=${myId}`);
                 const contacts = await res.json();
 
-                const ul = document.getElementById('contacts');
+                // ИСПРАВЛЕНИЕ ТУТ: Ищем правильный ID из HTML
+                const ul = document.getElementById('user-list');
                 ul.innerHTML = '';
 
-                // ЗАЩИТА: Если сервер вернул не список, останавливаемся
                 if (!Array.isArray(contacts)) return;
 
                 contacts.forEach(c => {
-                    const li = document.createElement('li');
-                    li.innerText = c.name;
-                    li.onclick = () => selectChat(c.id, c.name);
-                    ul.appendChild(li);
+                    // Создаем красивый блок контакта, а не просто <li>
+                    const div = document.createElement('div');
+                    div.className = 'user-item';
+                    div.innerHTML = `<div class="avatar-circle">${c.name.charAt(0).toUpperCase()}</div> ${c.name}`;
+                    div.onclick = () => selectChat(c.id, c.name);
+                    ul.appendChild(div);
                 });
             } catch (e) {
                 console.error("Ошибка при загрузке контактов:", e);
@@ -419,13 +421,34 @@
 
         async function addFriend() {
             const code = document.getElementById('friend-code').value.toUpperCase();
-            const res = await fetch('/add-contact', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: myId, code })
-            });
-            if (res.ok) { document.getElementById('friend-code').value = ''; loadContacts(); }
-            else { const err = await res.json(); alert(err.error); }
+
+            if (!code) return; // Защита от пустого ввода
+
+            try {
+                const res = await fetch('/add-contact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: myId, code })
+                });
+
+                if (res.ok) {
+                    document.getElementById('friend-code').value = '';
+                    loadContacts();
+                } else {
+                    // Читаем ответ сервера как текст, чтобы избежать ошибки JSON
+                    const errText = await res.text();
+                    try {
+                        // Пытаемся превратить текст в JSON
+                        const errObj = JSON.parse(errText);
+                        alert(errObj.error || "Не удалось добавить друга");
+                    } catch (e) {
+                        // Если сервер прислал кракозябры или HTML-ошибку
+                        alert("Ошибка сервера при добавлении: " + errText);
+                    }
+                }
+            } catch (e) {
+                alert("Ошибка сети. Проверьте подключение.");
+            }
         }
 
         async function selectChat(id, name) {
