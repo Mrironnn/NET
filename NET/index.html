@@ -396,17 +396,25 @@
         }
 
         async function loadContacts() {
-            const res = await fetch(`/contacts?userId=${myId}`);
-            const users = await res.json();
-            const list = document.getElementById('user-list');
-            list.innerHTML = '';
-            users.forEach(u => {
-                const el = document.createElement('div');
-                el.className = 'user-item';
-                el.innerHTML = `<div class="avatar-circle">${u.name[0].toUpperCase()}</div> ${u.name}`;
-                el.onclick = () => selectChat(u.id, u.name);
-                list.appendChild(el);
-            });
+            try {
+                const res = await fetch(`/contacts?userId=${myId}`);
+                const contacts = await res.json();
+
+                const ul = document.getElementById('contacts');
+                ul.innerHTML = '';
+
+                // ЗАЩИТА: Если сервер вернул не список, останавливаемся
+                if (!Array.isArray(contacts)) return;
+
+                contacts.forEach(c => {
+                    const li = document.createElement('li');
+                    li.innerText = c.name;
+                    li.onclick = () => selectChat(c.id, c.name);
+                    ul.appendChild(li);
+                });
+            } catch (e) {
+                console.error("Ошибка при загрузке контактов:", e);
+            }
         }
 
         async function addFriend() {
@@ -422,16 +430,29 @@
 
         async function selectChat(id, name) {
             currentChatId = id;
-            // Добавили кнопку назад прямо в заголовок
-            document.getElementById('chat-with').innerHTML = `<span class="back-btn" onclick="closeMobileChat()">⬅️</span> ${name}`;
+
+            // Если есть кнопка назад (для телефона)
+            const backBtnHtml = window.innerWidth <= 768 ? '<span class="back-btn" onclick="closeMobileChat()">⬅️</span>' : '';
+            document.getElementById('chat-with').innerHTML = `${backBtnHtml} ${name}`;
+
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
             ul.innerHTML = '';
-            const res = await fetch(`/messages?u1=${myId}&u2=${id}`);
-            const history = await res.json();
-            history.forEach(msg => {
-                renderMessage({ userId: msg.sender_id, user: (msg.sender_id === myId ? myName : name), text: msg.text, type: msg.type });
-            });
+
+            try {
+                const res = await fetch(`/messages?u1=${myId}&u2=${id}`);
+                const history = await res.json();
+
+                // ЗАЩИТА: Если база пустая или вернула ошибку
+                if (!Array.isArray(history)) return;
+
+                history.forEach(msg => {
+                    renderMessage({ userId: msg.sender_id, user: (msg.sender_id === myId ? myName : name), text: msg.text, type: msg.type });
+                });
+                ul.scrollTop = ul.scrollHeight;
+            } catch (e) {
+                console.error("Ошибка при загрузке истории:", e);
+            }
         }
 
         // --- ЛОГИКА ОЧЕРЕДИ УВЕДОМЛЕНИЙ ---
@@ -525,45 +546,49 @@
         const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); // Можно заменить на свой файл
 
         socket.on('chat message', (data) => {
-            // Определяем, открыт ли сейчас этот чат
-            const isCurrentChat = data.toId === currentChatId || (data.toId === myId && data.userId === currentChatId);
+            // 1. ЖЕСТКИЙ ФИЛЬТР: Если это сообщение отправлено НЕ мне и НЕ от меня - выкидываем его!
+            // Это защита на тот случай, если сервер случайно рассылает сообщения всем подряд.
+            if (data.userId !== myId && data.toId !== myId) return;
 
+            // 2. ПРАВИЛЬНАЯ ПРОВЕРКА ЧАТА: 
+            // Сообщение принадлежит этому экрану ТОЛЬКО если это диалог между МНОЙ и ТЕКУЩИМ СОБЕСЕДНИКОМ
+            const isCurrentChat =
+                (data.userId === myId && data.toId === currentChatId) ||
+                (data.userId === currentChatId && data.toId === myId);
+
+            // 3. Отрисовываем сообщение
             if (isCurrentChat) {
                 renderMessage(data);
             }
 
-            // ЛОГИКА УВЕДОМЛЕНИЙ
-            // Уведомление нужно, если: вкладка скрыта ИЛИ мы в другом чате
-            if (document.hidden || !isCurrentChat) {
+            // 4. ЛОГИКА УВЕДОМЛЕНИЙ
+            // Уведомляем только если сообщение пришло МНЕ (а не я отправил его с другого устройства)
+            if (data.toId === myId && data.userId !== myId) {
 
-                // Звук (сработает, если вкладка скрыта)
-                if (document.hidden) {
-                    notifySound.play().catch(e => console.log("Звук заблокирован браузером"));
-                }
+                // Показываем уведомление, если вкладка свернута или мы в другом чате
+                if (document.hidden || !isCurrentChat) {
+                    const msgSnippet = data.type === 'image' ? '🖼️ Фотография' : data.text;
 
-                const msgSnippet = data.type === 'image' ? '🖼️ Фотография' : data.text;
+                    // Звук (только если вкладка скрыта)
+                    if (document.hidden && typeof notifySound !== 'undefined') {
+                        notifySound.play().catch(e => console.log("Звук заблокирован"));
+                    }
 
-                // 2. Внутрисайтовое уведомление (Toast) показываем, только если мы не в этом чате
-                if (!isCurrentChat) {
-                    showToast(data.user, msgSnippet);
-                }
+                    // Внутрисайтовое уведомление (только если мы не в этом чате)
+                    if (!isCurrentChat) {
+                        showToast(data.user, msgSnippet);
+                    }
 
-                // 3. Системное уведомление (для свернутого браузера)
-                if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                    const notif = new Notification(`Новое сообщение от ${data.user}`, {
-                        body: msgSnippet,
-                        tag: 'chat-notification', // Исправляет баг: новые сообщения будут заменять старые, а не спамить
-                        icon: '/favicon.ico'      // Можно добавить иконку сайта
-                    });
-
-                    // Закрываем через 5 секунд, чтобы не висело вечно
-                    setTimeout(() => notif.close(), 5000);
-
-                    // При клике на уведомление — перекидываем пользователя на вкладку
-                    notif.onclick = () => {
-                        window.focus();
-                        notif.close();
-                    };
+                    // Системное уведомление (если браузер свернут)
+                    if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                        const notif = new Notification(`Новое сообщение от ${data.user}`, {
+                            body: msgSnippet,
+                            tag: 'chat-notification',
+                            icon: '/favicon.ico'
+                        });
+                        setTimeout(() => notif.close(), 5000);
+                        notif.onclick = () => { window.focus(); notif.close(); };
+                    }
                 }
             }
         });
