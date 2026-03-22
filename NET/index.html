@@ -67,7 +67,6 @@
             height: 100dvh;
         }
 
-        /* Обновленный Header с аватаркой */
         .header {
             padding: 20px;
             border-bottom: 1px solid #222;
@@ -191,7 +190,6 @@
                 background: #1e1e1e;
             }
 
-        /* --- СТИЛИ АВАТАРОК --- */
         .avatar-img, .avatar-circle {
             border-radius: 50%;
             object-fit: cover;
@@ -223,7 +221,6 @@
             border: 3px solid #222;
         }
 
-        /* Загрузка аватарки при регистрации */
         .reg-avatar-upload {
             width: 80px;
             height: 80px;
@@ -269,7 +266,6 @@
             letter-spacing: 2px;
         }
 
-        /* --- СТИЛИ ПРОФИЛЯ (МОДАЛЬНОЕ ОКНО С БЛЮРОМ) --- */
         .profile-modal {
             position: fixed;
             top: 0;
@@ -277,7 +273,7 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(8px); /* Тот самый блюр */
+            backdrop-filter: blur(8px);
             display: none;
             justify-content: center;
             align-items: center;
@@ -345,7 +341,6 @@
             border: 2px solid var(--panel);
         }
 
-        /* Уведомления. Z-index 1000 - поверх блюра */
         #toast-container {
             position: fixed;
             bottom: 20px;
@@ -383,6 +378,7 @@
             font-size: 1.2em;
         }
 
+        /* ИСПРАВЛЕННАЯ МОБИЛЬНАЯ ВЕРСИЯ */
         @media (max-width: 768px) {
             #main-app {
                 position: relative;
@@ -394,11 +390,11 @@
             }
 
             .chat-area {
-                position: absolute;
+                position: fixed; /* Fixed решает проблему с высотой в Яндексе */
                 top: 0;
                 left: 0;
-                width: 100%;
-                height: 100%;
+                width: 100vw;
+                height: 100dvh;
                 z-index: 10;
                 background: var(--bg);
             }
@@ -427,7 +423,6 @@
 </head>
 <body>
     <div id="toast-container"></div>
-
     <div id="auth-modal" class="modal">
         <div class="auth-box">
             <div class="net-logo">N<span>E</span>T</div>
@@ -438,7 +433,6 @@
             <p style="font-size: 0.8em; margin-top: 15px; cursor: pointer; color: #888;" onclick="toggleAuth()">Нет аккаунта? Регистрация</p>
         </div>
     </div>
-
     <div id="name-modal" class="modal" style="display: none;">
         <div class="auth-box">
             <h2>Создание профиля</h2>
@@ -451,19 +445,16 @@
             <button onclick="saveInitProfile()" style="width:100%">Начать</button>
         </div>
     </div>
-
     <div id="profile-modal" class="profile-modal" onclick="closeProfile(event)">
         <div class="profile-card" onclick="event.stopPropagation()">
             <div style="position: relative; display: inline-block;">
                 <div id="profile-avatar-container"></div>
-                <div id="edit-avatar-btn" class="edit-avatar-badge" onclick="document.getElementById('prof-avatar-input').click()">📷</div>
+                <div id="edit-avatar-btn" class="edit-avatar-badge" onclick="document.getElementById('prof-avatar-input').click()"> 📷 </div>
                 <input type="file" id="prof-avatar-input" style="display:none" onchange="updateProfileAvatar()" accept="image/*">
             </div>
-
             <h2 id="profile-name" class="profile-name">Имя</h2>
             <div id="profile-desc-display" class="profile-desc"></div>
             <textarea id="profile-desc-input" class="profile-desc-edit" placeholder="Напишите немного о себе..."></textarea>
-
             <div id="profile-edit-controls" class="edit-controls">
                 <button onclick="toggleEditMode()" style="background:#333;">Отмена</button>
                 <button onclick="saveProfileChanges()">Сохранить</button>
@@ -471,7 +462,6 @@
             <button id="profile-start-edit-btn" onclick="toggleEditMode()" style="margin-top:15px; width:100%; display:none;">Редактировать описание</button>
         </div>
     </div>
-
     <div id="main-app">
         <div class="sidebar">
             <div class="header">
@@ -490,33 +480,28 @@
             </div>
             <div id="user-list"></div>
         </div>
-
         <div class="chat-area" id="chat-area">
             <div class="header" id="chat-with">Чат</div>
             <div id="messages"></div>
             <div class="input-box">
                 <input type="file" id="file-input" style="display:none" onchange="uploadPhotoMsg()" accept="image/*">
-                <button onclick="document.getElementById('file-input').click()" style="background: #333; padding: 10px 15px;">📎</button>
+                <button onclick="document.getElementById('file-input').click()" style="background: #333; padding: 10px 15px;"> 📎 </button>
                 <input type="text" id="msg-input" placeholder="Сообщение...">
                 <button onclick="send()" style="padding: 10px 20px;">Отправить</button>
             </div>
         </div>
     </div>
-
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let myId, myName, myCode, currentChatId = null;
         let myAvatar = '';
         let myDescription = '';
-        let tempRegAvatarUrl = ''; // Для хранения фото при регистрации
-        let contactsMap = {}; // Храним данные друзей для быстрого доступа к аватаркам в чате
-
-        let currentProfileEditId = null; // ID профиля, открытого в данный момент
+        let tempRegAvatarUrl = '';
+        let contactsMap = {};
+        let currentProfileEditId = null;
         let isEditingProfile = false;
 
-        // --- ГЕНЕРАТОР АВАТАРОК ---
-        // Если есть ссылка - картинка, если нет - кружок с буквой
         function getAvatarHtml(name, avatarUrl, sizeClass, onclickStr = '') {
             const letter = (name || 'U').charAt(0).toUpperCase();
             if (avatarUrl && avatarUrl.trim() !== '') {
@@ -526,12 +511,14 @@
         }
 
         window.onload = async () => {
-            const savedSession = localStorage.getItem('net_session');
-            if (savedSession) {
-                const data = JSON.parse(savedSession);
-                const res = await fetch(`/validate-session?id=${data.id}`);
-                const status = await res.json();
+            // Очищаем старые забагованные сессии
+            localStorage.removeItem('net_session');
 
+            // Загружаем только по безопасному токену
+            const savedToken = localStorage.getItem('net_session_token');
+            if (savedToken) {
+                const res = await fetch(`/validate-session?token=${savedToken}`);
+                const status = await res.json();
                 if (status.valid) {
                     myId = status.user.id;
                     myName = status.user.name;
@@ -541,7 +528,7 @@
                     document.getElementById('auth-modal').style.display = 'none';
                     startApp();
                 } else {
-                    localStorage.removeItem('net_session');
+                    localStorage.removeItem('net_session_token');
                 }
             }
         };
@@ -565,18 +552,20 @@
             const data = await res.json();
             if (res.ok) {
                 myId = data.id; myCode = data.code;
+                localStorage.setItem('net_session_token', data.token); // Сохраняем ТОКЕН
+
                 document.getElementById('auth-modal').style.display = 'none';
                 if (isReg) {
                     document.getElementById('name-modal').style.display = 'flex';
                 } else {
                     myName = data.name; myAvatar = data.avatar || ''; myDescription = data.description || '';
-                    saveLocalSession();
                     startApp();
                 }
-            } else alert(data.error);
+            } else {
+                showToast("Ошибка", data.error);
+            }
         }
 
-        // --- РЕГИСТРАЦИЯ: Загрузка фото до сохранения имени ---
         async function previewRegAvatar() {
             const fileInput = document.getElementById('reg-avatar-input');
             if (!fileInput.files[0]) return;
@@ -600,23 +589,15 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: myId, name: myName, avatar: myAvatar })
             });
-            saveLocalSession();
             document.getElementById('name-modal').style.display = 'none';
             startApp();
-        }
-
-        function saveLocalSession() {
-            localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
         }
 
         function startApp() {
             document.getElementById('main-app').style.display = 'flex';
             document.getElementById('my-code-display').innerText = myCode;
             document.getElementById('my-name-display').innerText = myName;
-
-            // Отрисовка своей аватарки в шапке
             document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
-
             socket.emit('join', myId);
             loadContacts();
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -624,43 +605,31 @@
             }
         }
 
-        // --- ЛОГИКА ПРОФИЛЕЙ ---
         async function openProfile(userId) {
-            // Если кликнули на аватарку, не даем событию провалиться ниже
             if (event) event.stopPropagation();
-
             const res = await fetch(`/profile/${userId}`);
             const user = await res.json();
-
-            if (user.error) return alert("Ошибка загрузки профиля");
-
+            if (user.error) {
+                showToast("Ошибка", "Ошибка загрузки профиля");
+                return;
+            }
             currentProfileEditId = userId;
             const isMe = userId === myId;
-
             document.getElementById('profile-name').innerText = user.name;
             document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(user.name, user.avatar, 'sz-lg');
-
-            // Описание
             const desc = user.description || (isMe ? "У вас пока нет описания. Расскажите о себе!" : "Пользователь пока ничего не рассказал о себе.");
             document.getElementById('profile-desc-display').innerText = desc;
             document.getElementById('profile-desc-input').value = user.description || '';
-
-            // Права доступа (защита)
             document.getElementById('edit-avatar-btn').style.display = isMe ? 'flex' : 'none';
             document.getElementById('profile-start-edit-btn').style.display = isMe ? 'block' : 'none';
-
-            // Сброс состояния редактирования
             isEditingProfile = false;
             document.getElementById('profile-desc-display').style.display = 'block';
             document.getElementById('profile-desc-input').style.display = 'none';
             document.getElementById('profile-edit-controls').style.display = 'none';
-
-            // Показываем окно
             document.getElementById('profile-modal').classList.add('show');
         }
 
         function closeProfile(e) {
-            // Закрываем только если кликнули по темному фону (не по самой карточке)
             if (e && e.target.id !== 'profile-modal') return;
             document.getElementById('profile-modal').classList.remove('show');
         }
@@ -691,20 +660,16 @@
             formData.append('photo', fileInput.files[0]);
             const res = await fetch('/upload', { method: 'POST', body: formData });
             const data = await res.json();
-
             if (data.url) {
                 myAvatar = data.url;
-                // Сразу сохраняем в базу
                 await fetch('/edit-profile', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: myId, description: myDescription, avatar: myAvatar })
                 });
-                // Обновляем картинки
                 document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-lg');
                 document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
             }
         }
-
 
         async function loadContacts() {
             try {
@@ -712,18 +677,13 @@
                 const contacts = await res.json();
                 const ul = document.getElementById('user-list');
                 ul.innerHTML = '';
-                contactsMap = {}; // Очищаем старую мапу
-
+                contactsMap = {};
                 if (!Array.isArray(contacts)) return;
-
                 contacts.forEach(c => {
-                    contactsMap[c.id] = c; // Запоминаем данные друга для чата
+                    contactsMap[c.id] = c;
                     const div = document.createElement('div');
                     div.className = 'user-item';
-
-                    // Аватарка, при клике на которую открывается профиль
                     const avatarHtml = getAvatarHtml(c.name, c.avatar, 'sz-sm', `openProfile(${c.id})`);
-
                     div.innerHTML = `${avatarHtml} <span style="flex-grow:1;" onclick="selectChat(${c.id}, '${c.name}')">${c.name}</span>`;
                     ul.appendChild(div);
                 });
@@ -743,24 +703,20 @@
                     loadContacts();
                 } else {
                     const errObj = await res.json();
-                    alert(errObj.error || "Ошибка");
+                    showToast("Внимание", errObj.error || "Ошибка добавления"); // Избавились от alert
                 }
-            } catch (e) { alert("Ошибка сети"); }
+            } catch (e) { showToast("Ошибка", "Проверьте подключение"); }
         }
 
         async function selectChat(id, name) {
             currentChatId = id;
             const backBtnHtml = window.innerWidth <= 768 ? '<span class="back-btn" onclick="closeMobileChat()">⬅️</span>' : '';
-
-            // В шапке чата тоже показываем аватарку друга
             const friendData = contactsMap[id];
             const headerAvatar = getAvatarHtml(name, friendData?.avatar, 'sz-sm', `openProfile(${id})`);
-
             document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px;">${headerAvatar} ${name}</div>`;
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
             ul.innerHTML = '';
-
             try {
                 const res = await fetch(`/messages?u1=${myId}&u2=${id}`);
                 const history = await res.json();
@@ -777,7 +733,6 @@
             toastQueue.push({ title, text });
             if (!isToastProcessing) processToastQueue();
         }
-
         function processToastQueue() {
             if (toastQueue.length === 0) { isToastProcessing = false; return; }
             isToastProcessing = true;
@@ -818,7 +773,7 @@
             const data = await res.json();
             if (data.url) {
                 socket.emit('chat message', { userId: myId, toId: currentChatId, text: data.url, type: 'image' });
-            } else alert("Ошибка!");
+            } else showToast("Ошибка", "Не удалось загрузить фото");
             fileInput.value = '';
         }
 
@@ -826,61 +781,47 @@
             const isMe = data.userId === myId;
             let senderName = myName;
             let senderAvatarUrl = myAvatar;
-
-            // Если сообщение от друга, достаем его данные из мапы контактов
             if (!isMe) {
                 const friendInfo = contactsMap[data.userId];
                 senderName = friendInfo ? friendInfo.name : 'Unknown';
                 senderAvatarUrl = friendInfo ? friendInfo.avatar : '';
             }
-
             const div = document.createElement('div');
             div.className = `msg-container ${isMe ? 'my-msg-container' : ''}`;
-
-            // Аватарка в чате
             const avatarHtml = getAvatarHtml(senderName, senderAvatarUrl, 'sz-sm', `openProfile(${data.userId})`);
-
-            // Само сообщение
             let contentHtml = '';
             if (data.type === 'image') {
                 contentHtml = `<img src="${data.text}" style="max-width:100%; border-radius:10px; display:block;">`;
             } else {
                 contentHtml = data.text;
             }
-
             div.innerHTML = `
-                    ${avatarHtml}
-                    <div class="msg ${isMe ? 'my-msg' : ''}">
-                        ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
-                        ${contentHtml}
-                    </div>
+                ${avatarHtml}
+                <div class="msg ${isMe ? 'my-msg' : ''}">
+                ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
+                ${contentHtml}
+                </div>
                 `;
-
             document.getElementById('messages').appendChild(div);
             const obj = document.getElementById('messages');
             obj.scrollTop = obj.scrollHeight;
         }
 
         document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
-
         const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
 
         socket.on('chat message', (data) => {
             if (data.userId !== myId && data.toId !== myId) return;
             const isCurrentChat = (data.userId === myId && data.toId === currentChatId) || (data.userId === currentChatId && data.toId === myId);
-
             if (isCurrentChat) renderMessage(data);
-
             if (data.toId === myId && data.userId !== myId) {
                 if (document.hidden || !isCurrentChat) {
                     const friendName = contactsMap[data.userId]?.name || 'User';
-                    const msgSnippet = data.type === 'image' ? '🖼️ Фотография' : data.text;
-
+                    const msgSnippet = data.type === 'image' ? ' 🖼 ️ Фотография' : data.text;
                     if (document.hidden && typeof notifySound !== 'undefined') {
                         notifySound.play().catch(e => console.log("Sound error"));
                     }
                     if (!isCurrentChat) showToast(friendName, msgSnippet);
-
                     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
                         const notif = new Notification(`Новое сообщение от ${friendName}`, { body: msgSnippet });
                         setTimeout(() => notif.close(), 5000);
@@ -889,7 +830,6 @@
                 }
             }
         });
-
         socket.on('contact added', () => loadContacts());
     </script>
 </body>
