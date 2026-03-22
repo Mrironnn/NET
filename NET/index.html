@@ -22,8 +22,6 @@
             flex-direction: column;
         }
 
-
-
         .modal {
             position: fixed;
             top: 0;
@@ -69,13 +67,31 @@
             height: 100dvh;
         }
 
+        /* Обновленный Header с аватаркой */
         .header {
             padding: 20px;
             border-bottom: 1px solid #222;
             font-weight: bold;
             font-size: 1.1em;
             letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
+
+        .my-profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+
+            .my-profile-btn:hover {
+                background: #222;
+            }
 
         .net-logo {
             font-size: 1.5em;
@@ -98,18 +114,28 @@
             margin: 0;
         }
 
+        .msg-container {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 8px;
+            max-width: 75%;
+        }
+
+            .msg-container.my-msg-container {
+                align-self: flex-end;
+                flex-direction: row-reverse;
+            }
+
         .msg {
             background: #1a1a1a;
             padding: 10px 15px;
             border-radius: 12px;
-            margin-bottom: 8px;
-            max-width: 70%;
             border: 1px solid #222;
             word-wrap: break-word;
         }
 
         .my-msg {
-            align-self: flex-end;
             border-right: 3px solid var(--accent);
             background: #1e1e1e;
         }
@@ -125,7 +151,7 @@
             padding-bottom: calc(20px + env(safe-area-inset-bottom));
         }
 
-        input[type="text"], input[type="email"], input[type="password"] {
+        input[type="text"], input[type="email"], input[type="password"], textarea {
             background: #222;
             border: 1px solid #333;
             color: white;
@@ -134,6 +160,7 @@
             flex-grow: 1;
             outline: none;
             box-sizing: border-box;
+            font-family: inherit;
         }
 
         button {
@@ -164,15 +191,69 @@
                 background: #1e1e1e;
             }
 
-        .avatar-circle {
-            width: 35px;
-            height: 35px;
-            background: #333;
+        /* --- СТИЛИ АВАТАРОК --- */
+        .avatar-img, .avatar-circle {
             border-radius: 50%;
+            object-fit: cover;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            background: #333;
+            cursor: pointer;
+        }
+
+        .sz-sm {
+            width: 35px;
+            height: 35px;
+            font-size: 0.9em;
+        }
+
+        .sz-md {
+            width: 50px;
+            height: 50px;
+            font-size: 1.2em;
+        }
+
+        .sz-lg {
+            width: 120px;
+            height: 120px;
+            font-size: 2.5em;
+            border: 3px solid #222;
+        }
+
+        /* Загрузка аватарки при регистрации */
+        .reg-avatar-upload {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #222;
+            margin: 0 auto 20px auto;
+            border: 2px dashed #555;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .reg-avatar-upload:hover {
+                border-color: var(--accent);
+            }
+
+        .reg-avatar-text {
             font-size: 0.8em;
+            color: #888;
+        }
+
+        .reg-avatar-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            display: none;
         }
 
         .code-section {
@@ -187,7 +268,84 @@
             font-weight: bold;
             letter-spacing: 2px;
         }
-        /* --- СТИЛИ ДЛЯ УВЕДОМЛЕНИЙ --- */
+
+        /* --- СТИЛИ ПРОФИЛЯ (МОДАЛЬНОЕ ОКНО С БЛЮРОМ) --- */
+        .profile-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px); /* Тот самый блюр */
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+            .profile-modal.show {
+                display: flex;
+                opacity: 1;
+            }
+
+        .profile-card {
+            background: var(--panel);
+            width: 320px;
+            border-radius: 15px;
+            padding: 30px 20px;
+            text-align: center;
+            border: 1px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        .profile-name {
+            margin: 15px 0 5px 0;
+            font-size: 1.5em;
+        }
+
+        .profile-desc {
+            color: #aaa;
+            font-size: 0.95em;
+            min-height: 40px;
+            word-wrap: break-word;
+        }
+
+        .profile-desc-edit {
+            display: none;
+            width: 100%;
+            resize: none;
+            height: 80px;
+            margin-top: 10px;
+        }
+
+        .edit-controls {
+            margin-top: 15px;
+            display: none;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .edit-avatar-badge {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: var(--accent);
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            cursor: pointer;
+            border: 2px solid var(--panel);
+        }
+
+        /* Уведомления. Z-index 1000 - поверх блюра */
         #toast-container {
             position: fixed;
             bottom: 20px;
@@ -213,10 +371,10 @@
             word-wrap: break-word;
         }
 
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
+            .toast.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
 
         .back-btn {
             display: none;
@@ -225,15 +383,16 @@
             font-size: 1.2em;
         }
 
-        /* --- АДАПТИВНОСТЬ ПОД МОБИЛЬНЫЕ УСТРОЙСТВА --- */
         @media (max-width: 768px) {
             #main-app {
                 position: relative;
             }
+
             .sidebar {
                 width: 100%;
                 border-right: none;
             }
+
             .chat-area {
                 position: absolute;
                 top: 0;
@@ -242,21 +401,24 @@
                 height: 100%;
                 z-index: 10;
                 background: var(--bg);
-                /* Чат скрыт, пока мы не нажмем на контакт */
             }
+
             .back-btn {
-                display: inline-block; /* Показываем кнопку "Назад" на телефоне */
+                display: inline-block;
             }
+
             #toast-container {
                 bottom: auto;
-                top: 10px; /* На телефоне уведомления лучше показывать сверху */
+                top: 10px;
                 right: 10px;
                 left: 10px;
             }
+
             .toast {
                 max-width: unset;
                 width: calc(100% - 40px);
             }
+
             .auth-box {
                 width: 85%;
             }
@@ -265,6 +427,7 @@
 </head>
 <body>
     <div id="toast-container"></div>
+
     <div id="auth-modal" class="modal">
         <div class="auth-box">
             <div class="net-logo">N<span>E</span>T</div>
@@ -278,15 +441,46 @@
 
     <div id="name-modal" class="modal" style="display: none;">
         <div class="auth-box">
-            <h2>Как тебя зовут?</h2>
+            <h2>Создание профиля</h2>
+            <div class="reg-avatar-upload" onclick="document.getElementById('reg-avatar-input').click()">
+                <span class="reg-avatar-text">+ Фото</span>
+                <img id="reg-avatar-preview" class="reg-avatar-img">
+            </div>
+            <input type="file" id="reg-avatar-input" style="display:none" onchange="previewRegAvatar()" accept="image/*">
             <input type="text" id="new-name" placeholder="Твой ник"><br><br>
-            <button onclick="saveName()" style="width:100%">Начать</button>
+            <button onclick="saveInitProfile()" style="width:100%">Начать</button>
+        </div>
+    </div>
+
+    <div id="profile-modal" class="profile-modal" onclick="closeProfile(event)">
+        <div class="profile-card" onclick="event.stopPropagation()">
+            <div style="position: relative; display: inline-block;">
+                <div id="profile-avatar-container"></div>
+                <div id="edit-avatar-btn" class="edit-avatar-badge" onclick="document.getElementById('prof-avatar-input').click()">📷</div>
+                <input type="file" id="prof-avatar-input" style="display:none" onchange="updateProfileAvatar()" accept="image/*">
+            </div>
+
+            <h2 id="profile-name" class="profile-name">Имя</h2>
+            <div id="profile-desc-display" class="profile-desc"></div>
+            <textarea id="profile-desc-input" class="profile-desc-edit" placeholder="Напишите немного о себе..."></textarea>
+
+            <div id="profile-edit-controls" class="edit-controls">
+                <button onclick="toggleEditMode()" style="background:#333;">Отмена</button>
+                <button onclick="saveProfileChanges()">Сохранить</button>
+            </div>
+            <button id="profile-start-edit-btn" onclick="toggleEditMode()" style="margin-top:15px; width:100%; display:none;">Редактировать описание</button>
         </div>
     </div>
 
     <div id="main-app">
         <div class="sidebar">
-            <div class="header">NET</div>
+            <div class="header">
+                <span class="net-logo" style="margin:0; font-size:1.2em;">N<span>E</span>T</span>
+                <div class="my-profile-btn" onclick="openProfile(myId)">
+                    <span id="my-name-display" style="font-size: 0.9em; font-weight: normal;">...</span>
+                    <div id="my-avatar-display"></div>
+                </div>
+            </div>
             <div class="code-section">
                 Ваш код: <span class="code-display" id="my-code-display">...</span>
                 <div style="display:flex; gap:5px; margin-top:10px;">
@@ -299,11 +493,10 @@
 
         <div class="chat-area" id="chat-area">
             <div class="header" id="chat-with">Чат</div>
-            <ul id="messages"></ul>
+            <div id="messages"></div>
             <div class="input-box">
-                <input type="file" id="file-input" style="display:none" onchange="uploadPhoto()" accept="image/*">
+                <input type="file" id="file-input" style="display:none" onchange="uploadPhotoMsg()" accept="image/*">
                 <button onclick="document.getElementById('file-input').click()" style="background: #333; padding: 10px 15px;">📎</button>
-
                 <input type="text" id="msg-input" placeholder="Сообщение...">
                 <button onclick="send()" style="padding: 10px 20px;">Отправить</button>
             </div>
@@ -314,26 +507,40 @@
     <script>
         const socket = io();
         let myId, myName, myCode, currentChatId = null;
+        let myAvatar = '';
+        let myDescription = '';
+        let tempRegAvatarUrl = ''; // Для хранения фото при регистрации
+        let contactsMap = {}; // Храним данные друзей для быстрого доступа к аватаркам в чате
 
-        // --- НОВОЕ: Проверяем память браузера при перезагрузке (F5) ---
+        let currentProfileEditId = null; // ID профиля, открытого в данный момент
+        let isEditingProfile = false;
+
+        // --- ГЕНЕРАТОР АВАТАРОК ---
+        // Если есть ссылка - картинка, если нет - кружок с буквой
+        function getAvatarHtml(name, avatarUrl, sizeClass, onclickStr = '') {
+            const letter = (name || 'U').charAt(0).toUpperCase();
+            if (avatarUrl && avatarUrl.trim() !== '') {
+                return `<img src="${avatarUrl}" class="avatar-img ${sizeClass}" ${onclickStr ? `onclick="${onclickStr}"` : ''}>`;
+            }
+            return `<div class="avatar-circle ${sizeClass}" ${onclickStr ? `onclick="${onclickStr}"` : ''}>${letter}</div>`;
+        }
+
         window.onload = async () => {
             const savedSession = localStorage.getItem('net_session');
             if (savedSession) {
                 const data = JSON.parse(savedSession);
-
-                // Спрашиваем сервер: "Ты меня помнишь?"
                 const res = await fetch(`/validate-session?id=${data.id}`);
                 const status = await res.json();
 
                 if (status.valid) {
-                    myId = data.id;
-                    myName = data.name;
-                    myCode = data.code;
-                    document.getElementById('my-code-display').innerText = myCode;
+                    myId = status.user.id;
+                    myName = status.user.name;
+                    myCode = status.user.code;
+                    myAvatar = status.user.avatar || '';
+                    myDescription = status.user.description || '';
                     document.getElementById('auth-modal').style.display = 'none';
                     startApp();
                 } else {
-                    // Если база удалена или юзера нет — чистим память и на вход
                     localStorage.removeItem('net_session');
                 }
             }
@@ -352,112 +559,204 @@
             const password = document.getElementById('pass').value;
             const isReg = document.getElementById('auth-title').innerText === "Регистрация";
             const res = await fetch(isReg ? '/register' : '/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
             const data = await res.json();
             if (res.ok) {
                 myId = data.id; myCode = data.code;
-                document.getElementById('my-code-display').innerText = myCode;
                 document.getElementById('auth-modal').style.display = 'none';
-                if (isReg) document.getElementById('name-modal').style.display = 'flex';
-                else {
-                    myName = data.name;
-                    // --- НОВОЕ: Запоминаем данные при входе ---
-                    localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
+                if (isReg) {
+                    document.getElementById('name-modal').style.display = 'flex';
+                } else {
+                    myName = data.name; myAvatar = data.avatar || ''; myDescription = data.description || '';
+                    saveLocalSession();
                     startApp();
                 }
             } else alert(data.error);
         }
 
-        async function saveName() {
+        // --- РЕГИСТРАЦИЯ: Загрузка фото до сохранения имени ---
+        async function previewRegAvatar() {
+            const fileInput = document.getElementById('reg-avatar-input');
+            if (!fileInput.files[0]) return;
+            const formData = new FormData();
+            formData.append('photo', fileInput.files[0]);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.url) {
+                tempRegAvatarUrl = data.url;
+                const img = document.getElementById('reg-avatar-preview');
+                img.src = data.url;
+                img.style.display = 'block';
+                document.querySelector('.reg-avatar-text').style.display = 'none';
+            }
+        }
+
+        async function saveInitProfile() {
             myName = document.getElementById('new-name').value || "User";
-            await fetch('/update-name', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: myId, name: myName })
+            myAvatar = tempRegAvatarUrl;
+            await fetch('/update-profile-init', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: myId, name: myName, avatar: myAvatar })
             });
-            // --- НОВОЕ: Запоминаем данные при регистрации ---
-            localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
+            saveLocalSession();
             document.getElementById('name-modal').style.display = 'none';
             startApp();
         }
 
+        function saveLocalSession() {
+            localStorage.setItem('net_session', JSON.stringify({ id: myId, name: myName, code: myCode }));
+        }
+
         function startApp() {
             document.getElementById('main-app').style.display = 'flex';
+            document.getElementById('my-code-display').innerText = myCode;
+            document.getElementById('my-name-display').innerText = myName;
+
+            // Отрисовка своей аватарки в шапке
+            document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
+
             socket.emit('join', myId);
             loadContacts();
-
-            // Запрашиваем системные уведомления (браузер сам спросит пользователя)
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 Notification.requestPermission();
             }
         }
 
+        // --- ЛОГИКА ПРОФИЛЕЙ ---
+        async function openProfile(userId) {
+            // Если кликнули на аватарку, не даем событию провалиться ниже
+            if (event) event.stopPropagation();
+
+            const res = await fetch(`/profile/${userId}`);
+            const user = await res.json();
+
+            if (user.error) return alert("Ошибка загрузки профиля");
+
+            currentProfileEditId = userId;
+            const isMe = userId === myId;
+
+            document.getElementById('profile-name').innerText = user.name;
+            document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(user.name, user.avatar, 'sz-lg');
+
+            // Описание
+            const desc = user.description || (isMe ? "У вас пока нет описания. Расскажите о себе!" : "Пользователь пока ничего не рассказал о себе.");
+            document.getElementById('profile-desc-display').innerText = desc;
+            document.getElementById('profile-desc-input').value = user.description || '';
+
+            // Права доступа (защита)
+            document.getElementById('edit-avatar-btn').style.display = isMe ? 'flex' : 'none';
+            document.getElementById('profile-start-edit-btn').style.display = isMe ? 'block' : 'none';
+
+            // Сброс состояния редактирования
+            isEditingProfile = false;
+            document.getElementById('profile-desc-display').style.display = 'block';
+            document.getElementById('profile-desc-input').style.display = 'none';
+            document.getElementById('profile-edit-controls').style.display = 'none';
+
+            // Показываем окно
+            document.getElementById('profile-modal').classList.add('show');
+        }
+
+        function closeProfile(e) {
+            // Закрываем только если кликнули по темному фону (не по самой карточке)
+            if (e && e.target.id !== 'profile-modal') return;
+            document.getElementById('profile-modal').classList.remove('show');
+        }
+
+        function toggleEditMode() {
+            isEditingProfile = !isEditingProfile;
+            document.getElementById('profile-desc-display').style.display = isEditingProfile ? 'none' : 'block';
+            document.getElementById('profile-desc-input').style.display = isEditingProfile ? 'block' : 'none';
+            document.getElementById('profile-edit-controls').style.display = isEditingProfile ? 'flex' : 'none';
+            document.getElementById('profile-start-edit-btn').style.display = isEditingProfile ? 'none' : 'block';
+        }
+
+        async function saveProfileChanges() {
+            const newDesc = document.getElementById('profile-desc-input').value;
+            await fetch('/edit-profile', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: myId, description: newDesc, avatar: myAvatar })
+            });
+            myDescription = newDesc;
+            document.getElementById('profile-desc-display').innerText = newDesc || "У вас пока нет описания.";
+            toggleEditMode();
+        }
+
+        async function updateProfileAvatar() {
+            const fileInput = document.getElementById('prof-avatar-input');
+            if (!fileInput.files[0]) return;
+            const formData = new FormData();
+            formData.append('photo', fileInput.files[0]);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.url) {
+                myAvatar = data.url;
+                // Сразу сохраняем в базу
+                await fetch('/edit-profile', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: myId, description: myDescription, avatar: myAvatar })
+                });
+                // Обновляем картинки
+                document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-lg');
+                document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
+            }
+        }
+
+
         async function loadContacts() {
             try {
                 const res = await fetch(`/contacts?userId=${myId}`);
                 const contacts = await res.json();
-
-                // ИСПРАВЛЕНИЕ ТУТ: Ищем правильный ID из HTML
                 const ul = document.getElementById('user-list');
                 ul.innerHTML = '';
+                contactsMap = {}; // Очищаем старую мапу
 
                 if (!Array.isArray(contacts)) return;
 
                 contacts.forEach(c => {
-                    // Создаем красивый блок контакта, а не просто <li>
+                    contactsMap[c.id] = c; // Запоминаем данные друга для чата
                     const div = document.createElement('div');
                     div.className = 'user-item';
-                    div.innerHTML = `<div class="avatar-circle">${c.name.charAt(0).toUpperCase()}</div> ${c.name}`;
-                    div.onclick = () => selectChat(c.id, c.name);
+
+                    // Аватарка, при клике на которую открывается профиль
+                    const avatarHtml = getAvatarHtml(c.name, c.avatar, 'sz-sm', `openProfile(${c.id})`);
+
+                    div.innerHTML = `${avatarHtml} <span style="flex-grow:1;" onclick="selectChat(${c.id}, '${c.name}')">${c.name}</span>`;
                     ul.appendChild(div);
                 });
-            } catch (e) {
-                console.error("Ошибка при загрузке контактов:", e);
-            }
+            } catch (e) { console.error("Ошибка:", e); }
         }
 
         async function addFriend() {
             const code = document.getElementById('friend-code').value.toUpperCase();
-
-            if (!code) return; // Защита от пустого ввода
-
+            if (!code) return;
             try {
                 const res = await fetch('/add-contact', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId: myId, code })
                 });
-
                 if (res.ok) {
                     document.getElementById('friend-code').value = '';
                     loadContacts();
                 } else {
-                    // Читаем ответ сервера как текст, чтобы избежать ошибки JSON
-                    const errText = await res.text();
-                    try {
-                        // Пытаемся превратить текст в JSON
-                        const errObj = JSON.parse(errText);
-                        alert(errObj.error || "Не удалось добавить друга");
-                    } catch (e) {
-                        // Если сервер прислал кракозябры или HTML-ошибку
-                        alert("Ошибка сервера при добавлении: " + errText);
-                    }
+                    const errObj = await res.json();
+                    alert(errObj.error || "Ошибка");
                 }
-            } catch (e) {
-                alert("Ошибка сети. Проверьте подключение.");
-            }
+            } catch (e) { alert("Ошибка сети"); }
         }
 
         async function selectChat(id, name) {
             currentChatId = id;
-
-            // Если есть кнопка назад (для телефона)
             const backBtnHtml = window.innerWidth <= 768 ? '<span class="back-btn" onclick="closeMobileChat()">⬅️</span>' : '';
-            document.getElementById('chat-with').innerHTML = `${backBtnHtml} ${name}`;
 
+            // В шапке чата тоже показываем аватарку друга
+            const friendData = contactsMap[id];
+            const headerAvatar = getAvatarHtml(name, friendData?.avatar, 'sz-sm', `openProfile(${id})`);
+
+            document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px;">${headerAvatar} ${name}</div>`;
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
             ul.innerHTML = '';
@@ -465,61 +764,38 @@
             try {
                 const res = await fetch(`/messages?u1=${myId}&u2=${id}`);
                 const history = await res.json();
-
-                // ЗАЩИТА: Если база пустая или вернула ошибку
                 if (!Array.isArray(history)) return;
-
                 history.forEach(msg => {
-                    renderMessage({ userId: msg.sender_id, user: (msg.sender_id === myId ? myName : name), text: msg.text, type: msg.type });
+                    renderMessage({ userId: msg.sender_id, text: msg.text, type: msg.type });
                 });
-                ul.scrollTop = ul.scrollHeight;
-            } catch (e) {
-                console.error("Ошибка при загрузке истории:", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
-        // --- ЛОГИКА ОЧЕРЕДИ УВЕДОМЛЕНИЙ ---
         let toastQueue = [];
         let isToastProcessing = false;
-
         function showToast(title, text) {
             toastQueue.push({ title, text });
             if (!isToastProcessing) processToastQueue();
         }
 
         function processToastQueue() {
-            if (toastQueue.length === 0) {
-                isToastProcessing = false;
-                return;
-            }
+            if (toastQueue.length === 0) { isToastProcessing = false; return; }
             isToastProcessing = true;
-
             const data = toastQueue.shift();
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.innerHTML = `<strong>${data.title}</strong><br><span style="font-size: 0.9em; color: #ccc;">${data.text}</span>`;
-
             container.appendChild(toast);
-
-            // Плавное появление
             setTimeout(() => toast.classList.add('show'), 50);
-
-            // Удаление через 3 секунды
             setTimeout(() => {
                 toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 400); // ждем конец анимации
+                setTimeout(() => toast.remove(), 400);
             }, 3000);
-
-            // Запускаем следующее уведомление ровно через 1.5 секунды
-            if (toastQueue.length > 0) {
-                setTimeout(processToastQueue, 1500);
-            } else {
-                setTimeout(() => { isToastProcessing = false; }, 1500);
-            }
+            if (toastQueue.length > 0) setTimeout(processToastQueue, 1500);
+            else setTimeout(() => { isToastProcessing = false; }, 1500);
         }
 
-        // --- КНОПКА "НАЗАД" ДЛЯ МОБИЛОК ---
         function closeMobileChat() {
             document.getElementById('chat-area').style.visibility = 'hidden';
             currentChatId = null;
@@ -528,97 +804,93 @@
         function send() {
             const input = document.getElementById('msg-input');
             if (input.value && currentChatId) {
-                socket.emit('chat message', { userId: myId, user: myName, toId: currentChatId, text: input.value, type: 'text' });
+                socket.emit('chat message', { userId: myId, toId: currentChatId, text: input.value, type: 'text' });
                 input.value = '';
             }
         }
 
-        async function uploadPhoto() {
+        async function uploadPhotoMsg() {
             const fileInput = document.getElementById('file-input');
             if (!fileInput.files[0]) return;
             const formData = new FormData();
             formData.append('photo', fileInput.files[0]);
-
-            // Временный текст пока фото грузится (опционально)
             const res = await fetch('/upload', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.url) {
-                socket.emit('chat message', { userId: myId, user: myName, toId: currentChatId, text: data.url, type: 'image' });
-            } else {
-                alert("Ошибка загрузки фото!");
-            }
-            fileInput.value = ''; // Сбрасываем инпут
+                socket.emit('chat message', { userId: myId, toId: currentChatId, text: data.url, type: 'image' });
+            } else alert("Ошибка!");
+            fileInput.value = '';
         }
 
         function renderMessage(data) {
-            const li = document.createElement('li');
-            li.className = `msg ${data.userId === myId ? 'my-msg' : ''}`;
-            if (data.type === 'image') {
-                li.innerHTML = `<strong>${data.user}</strong><br><img src="${data.text}" style="max-width:100%; border-radius:10px; margin-top:5px; display:block;">`;
-            } else {
-                li.innerHTML = `<strong>${data.user}</strong><br>${data.text}`;
+            const isMe = data.userId === myId;
+            let senderName = myName;
+            let senderAvatarUrl = myAvatar;
+
+            // Если сообщение от друга, достаем его данные из мапы контактов
+            if (!isMe) {
+                const friendInfo = contactsMap[data.userId];
+                senderName = friendInfo ? friendInfo.name : 'Unknown';
+                senderAvatarUrl = friendInfo ? friendInfo.avatar : '';
             }
-            document.getElementById('messages').appendChild(li);
+
+            const div = document.createElement('div');
+            div.className = `msg-container ${isMe ? 'my-msg-container' : ''}`;
+
+            // Аватарка в чате
+            const avatarHtml = getAvatarHtml(senderName, senderAvatarUrl, 'sz-sm', `openProfile(${data.userId})`);
+
+            // Само сообщение
+            let contentHtml = '';
+            if (data.type === 'image') {
+                contentHtml = `<img src="${data.text}" style="max-width:100%; border-radius:10px; display:block;">`;
+            } else {
+                contentHtml = data.text;
+            }
+
+            div.innerHTML = `
+                    ${avatarHtml}
+                    <div class="msg ${isMe ? 'my-msg' : ''}">
+                        ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
+                        ${contentHtml}
+                    </div>
+                `;
+
+            document.getElementById('messages').appendChild(div);
             const obj = document.getElementById('messages');
             obj.scrollTop = obj.scrollHeight;
         }
 
         document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
 
-        // 1. В самом начале скрипта (вне socket.on) создай объект звука
-        const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); // Можно заменить на свой файл
+        const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
 
         socket.on('chat message', (data) => {
-            // 1. ЖЕСТКИЙ ФИЛЬТР: Если это сообщение отправлено НЕ мне и НЕ от меня - выкидываем его!
-            // Это защита на тот случай, если сервер случайно рассылает сообщения всем подряд.
             if (data.userId !== myId && data.toId !== myId) return;
+            const isCurrentChat = (data.userId === myId && data.toId === currentChatId) || (data.userId === currentChatId && data.toId === myId);
 
-            // 2. ПРАВИЛЬНАЯ ПРОВЕРКА ЧАТА: 
-            // Сообщение принадлежит этому экрану ТОЛЬКО если это диалог между МНОЙ и ТЕКУЩИМ СОБЕСЕДНИКОМ
-            const isCurrentChat =
-                (data.userId === myId && data.toId === currentChatId) ||
-                (data.userId === currentChatId && data.toId === myId);
+            if (isCurrentChat) renderMessage(data);
 
-            // 3. Отрисовываем сообщение
-            if (isCurrentChat) {
-                renderMessage(data);
-            }
-
-            // 4. ЛОГИКА УВЕДОМЛЕНИЙ
-            // Уведомляем только если сообщение пришло МНЕ (а не я отправил его с другого устройства)
             if (data.toId === myId && data.userId !== myId) {
-
-                // Показываем уведомление, если вкладка свернута или мы в другом чате
                 if (document.hidden || !isCurrentChat) {
+                    const friendName = contactsMap[data.userId]?.name || 'User';
                     const msgSnippet = data.type === 'image' ? '🖼️ Фотография' : data.text;
 
-                    // Звук (только если вкладка скрыта)
                     if (document.hidden && typeof notifySound !== 'undefined') {
-                        notifySound.play().catch(e => console.log("Звук заблокирован"));
+                        notifySound.play().catch(e => console.log("Sound error"));
                     }
+                    if (!isCurrentChat) showToast(friendName, msgSnippet);
 
-                    // Внутрисайтовое уведомление (только если мы не в этом чате)
-                    if (!isCurrentChat) {
-                        showToast(data.user, msgSnippet);
-                    }
-
-                    // Системное уведомление (если браузер свернут)
                     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                        const notif = new Notification(`Новое сообщение от ${data.user}`, {
-                            body: msgSnippet,
-                            tag: 'chat-notification',
-                            icon: '/favicon.ico'
-                        });
+                        const notif = new Notification(`Новое сообщение от ${friendName}`, { body: msgSnippet });
                         setTimeout(() => notif.close(), 5000);
                         notif.onclick = () => { window.focus(); notif.close(); };
                     }
                 }
             }
         });
-        // --- НОВОЕ: Слушаем сигнал от сервера о новом контакте ---
-        socket.on('contact added', () => {
-            loadContacts(); // Как только кто-то добавил нас, тихо и без перезагрузки обновляем список слева
-        });
+
+        socket.on('contact added', () => loadContacts());
     </script>
 </body>
 </html>

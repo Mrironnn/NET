@@ -9,10 +9,8 @@ const crypto = require('crypto');
 const multer = require('multer');
 const fs = require('fs');
 
-// Настройка порта для Render (или 1337 для локального теста)
 const PORT = process.env.PORT || 1337;
 
-// Создаем папку для картинок автоматически, если её нет
 const uploadDir = './uploads';
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
@@ -20,26 +18,23 @@ if (!fs.existsSync(uploadDir)) {
 
 app.use(express.json());
 app.use(express.static(__dirname));
-app.use('/uploads', express.static('uploads')); // Открываем доступ к фото
+app.use('/uploads', express.static('uploads'));
 
-// Подключаем базу (ОБЯЗАТЕЛЬНО УДАЛИ СТАРЫЙ database.db ПЕРЕД ЗАПУСКОМ)
+// 1. ОБНОВЛЕНА БАЗА ДАННЫХ: Добавлены поля avatar и description
 const db = new sqlite3.Database('./database.db');
 
 db.serialize(() => {
-    db.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, name TEXT, code TEXT UNIQUE)");
-    // Вот она, новая таблица сообщений с колонкой type!
+    db.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, name TEXT, code TEXT UNIQUE, avatar TEXT DEFAULT '', description TEXT DEFAULT '')");
     db.run("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, sender_id INTEGER, receiver_id INTEGER, text TEXT, type TEXT DEFAULT 'text', timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)");
     db.run("CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY, user_id INTEGER, contact_id INTEGER)");
 });
 
-// Настройка загрузки фото
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
 const upload = multer({ storage: storage });
 
-// Маршрут приема фото
 app.post('/upload', upload.single('photo'), (req, res) => {
     if (req.file) {
         res.json({ url: `/uploads/${req.file.filename}` });
@@ -48,7 +43,6 @@ app.post('/upload', upload.single('photo'), (req, res) => {
     }
 });
 
-// --- СТАНДАРТНЫЕ МАРШРУТЫ ---
 app.post('/register', async (req, res) => {
     const { email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -66,20 +60,36 @@ app.post('/login', async (req, res) => {
         if (!user) return res.status(400).json({ error: "Пользователь не найден" });
         const valid = await bcrypt.compare(password, user.password);
         if (!valid) return res.status(400).json({ error: "Неверный пароль" });
-        res.json({ id: user.id, name: user.name, code: user.code });
+        // Теперь возвращаем и аватар с описанием
+        res.json({ id: user.id, name: user.name, code: user.code, avatar: user.avatar, description: user.description });
     });
 });
 
-// Проверка: существует ли еще пользователь в базе
+// 2. ОБНОВЛЕНО: Получаем актуальные данные при перезагрузке страницы
 app.get('/validate-session', (req, res) => {
-    db.get("SELECT id FROM users WHERE id = ?", [req.query.id], (err, user) => {
-        if (user) res.json({ valid: true });
+    db.get("SELECT id, name, code, avatar, description FROM users WHERE id = ?", [req.query.id], (err, user) => {
+        if (user) res.json({ valid: true, user });
         else res.json({ valid: false });
     });
 });
 
-app.post('/update-name', (req, res) => {
-    db.run("UPDATE users SET name = ? WHERE id = ?", [req.body.name, req.body.id], () => res.json({ success: true }));
+// 3. НОВОЕ: Обновление профиля при регистрации (Имя + Аватарка)
+app.post('/update-profile-init', (req, res) => {
+    db.run("UPDATE users SET name = ?, avatar = ? WHERE id = ?", [req.body.name, req.body.avatar, req.body.id], () => res.json({ success: true }));
+});
+
+// 4. НОВОЕ: Эндпоинт для получения чужого или своего профиля
+app.get('/profile/:id', (req, res) => {
+    db.get("SELECT id, name, avatar, description FROM users WHERE id = ?", [req.params.id], (err, user) => {
+        if (user) res.json(user);
+        else res.status(404).json({ error: "Пользователь не найден" });
+    });
+});
+
+// 5. НОВОЕ: Редактирование профиля (Описание и Аватар)
+app.post('/edit-profile', (req, res) => {
+    const { id, description, avatar } = req.body;
+    db.run("UPDATE users SET description = ?, avatar = ? WHERE id = ?", [description, avatar, id], () => res.json({ success: true }));
 });
 
 app.post('/add-contact', (req, res) => {
@@ -92,17 +102,16 @@ app.post('/add-contact', (req, res) => {
             if (existing) return res.status(400).json({ error: "Пользователь уже в контактах" });
 
             db.run("INSERT INTO contacts (user_id, contact_id) VALUES (?, ?), (?, ?)", [userId, friend.id, friend.id, userId], () => {
-                // --- НОВОЕ: Мгновенно сообщаем другу, что его кто-то добавил ---
                 io.to(String(friend.id)).emit('contact added');
-
                 res.json({ success: true });
             });
         });
     });
 });
 
+// 6. ОБНОВЛЕНО: Подтягиваем аватарки контактов
 app.get('/contacts', (req, res) => {
-    db.all(`SELECT users.id, users.name FROM users JOIN contacts ON users.id = contacts.contact_id WHERE contacts.user_id = ?`, [req.query.userId], (err, rows) => {
+    db.all(`SELECT users.id, users.name, users.avatar FROM users JOIN contacts ON users.id = contacts.contact_id WHERE contacts.user_id = ?`, [req.query.userId], (err, rows) => {
         res.json(rows || []);
     });
 });
@@ -114,25 +123,19 @@ app.get('/messages', (req, res) => {
     });
 });
 
-// --- SOCKET.IO ---
 io.on('connection', (socket) => {
-    // 1. Когда пользователь входит, сажаем его в персональную комнату по его ID
     socket.on('join', (userId) => {
         socket.join(String(userId));
     });
 
     socket.on('chat message', (data) => {
         if (!data.userId || !data.toId) return;
-
-        // Защита: проверяем тип сообщения
         const msgType = data.type === 'image' ? 'image' : 'text';
 
-        // Сохраняем в базу, и только ПОСЛЕ успешного сохранения рассылаем клиентам
         db.run("INSERT INTO messages (sender_id, receiver_id, text, type) VALUES (?, ?, ?, ?)", [data.userId, data.toId, data.text, msgType], function (err) {
             if (err) {
                 console.error("Ошибка сохранения сообщения:", err);
             } else {
-                // 2. ИСПРАВЛЕНИЕ: Отправляем сообщение ТОЛЬКО в комнаты отправителя и получателя
                 io.to(String(data.userId)).to(String(data.toId)).emit('chat message', data);
             }
         });
