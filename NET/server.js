@@ -20,14 +20,19 @@ app.use(express.json());
 app.use(express.static(__dirname));
 app.use('/uploads', express.static('uploads'));
 
-// 1. В базу добавлена колонка token
+// 1. В базу добавлена колонка token и reply_text
 const db = new sqlite3.Database('./database.db');
 db.serialize(() => {
     db.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, email TEXT UNIQUE, password TEXT, name TEXT, code TEXT UNIQUE, avatar TEXT DEFAULT '', description TEXT DEFAULT '', token TEXT)");
     db.run("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY, sender_id INTEGER, receiver_id INTEGER, text TEXT, type TEXT DEFAULT 'text', timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)");
     db.run("CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY, user_id INTEGER, contact_id INTEGER)");
-});
 
+    // Безопасное добавление колонки для ответов
+    db.all("PRAGMA table_info(messages)", (err, rows) => {
+        const cols = rows.map(r => r.name);
+        if (!cols.includes('reply_text')) db.run("ALTER TABLE messages ADD COLUMN reply_text TEXT DEFAULT NULL");
+    });
+});
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
@@ -122,22 +127,59 @@ app.get('/messages', (req, res) => {
     });
 });
 
+const onlineUsers = new Map(); // Хранилище онлайна
+
 io.on('connection', (socket) => {
     socket.on('join', (userId) => {
-        socket.join(String(userId));
+        const uIdStr = String(userId);
+        socket.userId = uIdStr;
+        socket.join(uIdStr);
+
+        // Считаем вкладки пользователя
+        let count = onlineUsers.get(uIdStr) || 0;
+        onlineUsers.set(uIdStr, count + 1);
+
+        // Если это первая открытая вкладка - говорим всем, что он онлайн
+        if (count === 0) {
+            io.emit('user_status', { userId: uIdStr, status: 'online' });
+        }
+        // Отправляем список онлайна самому пользователю
+        socket.emit('initial_online_list', Array.from(onlineUsers.keys()));
     });
 
     socket.on('chat message', (data) => {
         if (!data.userId || !data.toId) return;
         const msgType = data.type === 'image' ? 'image' : 'text';
+        const replyText = data.replyText || null; // Ловим ответ
 
-        db.run("INSERT INTO messages (sender_id, receiver_id, text, type) VALUES (?, ?, ?, ?)", [data.userId, data.toId, data.text, msgType], function (err) {
-            if (err) {
-                console.error("Ошибка сохранения сообщения:", err);
+        db.run("INSERT INTO messages (sender_id, receiver_id, text, type, reply_text) VALUES (?, ?, ?, ?, ?)",
+            [data.userId, data.toId, data.text, msgType, replyText], function (err) {
+                if (err) {
+                    console.error("Ошибка сохранения сообщения:", err);
+                } else {
+                    // Возвращаем сообщение обратно с полем reply_text
+                    io.to(String(data.userId)).to(String(data.toId)).emit('chat message', {
+                        userId: data.userId,
+                        toId: data.toId,
+                        text: data.text,
+                        type: msgType,
+                        reply_text: replyText
+                    });
+                }
+            });
+    });
+
+    // Логика отключения (закрыл сайт)
+    socket.on('disconnect', () => {
+        if (socket.userId) {
+            let count = onlineUsers.get(socket.userId) || 0;
+            if (count > 1) {
+                onlineUsers.set(socket.userId, count - 1);
             } else {
-                io.to(String(data.userId)).to(String(data.toId)).emit('chat message', data);
+                onlineUsers.delete(socket.userId);
+                io.emit('user_status', { userId: socket.userId, status: 'offline' });
             }
-        });
+        }
     });
 });
 

@@ -419,6 +419,110 @@
                 width: 85%;
             }
         }
+
+        /* --- СТАТУСЫ ОНЛАЙН --- */
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            vertical-align: middle;
+            transition: 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .status-online {
+            background-color: #4CAF50; /* Зеленый цвет для онлайна */
+            box-shadow: 0 0 5px #4CAF50;
+        }
+
+        .status-offline {
+            background-color: #666; /* Серый для оффлайна */
+        }
+
+        /* --- ОТВЕТЫ НА СООБЩЕНИЯ --- */
+        .msg {
+            position: relative;
+        }
+        /* Нужно для привязки точки */
+        .msg-dot {
+            position: absolute;
+            bottom: -5px;
+            width: 16px;
+            height: 16px;
+            background: var(--panel);
+            border: 1px solid #333;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #fff;
+            opacity: 0;
+            transition: 0.2s ease;
+            user-select: none;
+        }
+
+        .msg:hover .msg-dot {
+            opacity: 1;
+        }
+
+        .my-msg .msg-dot {
+            left: -20px;
+        }
+
+        .msg:not(.my-msg) .msg-dot {
+            right: -20px;
+        }
+
+        #msg-context-menu {
+            position: fixed;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 5px 0;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            min-width: 120px;
+        }
+
+        .msg-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text);
+            transition: background 0.2s;
+        }
+
+            .msg-menu-item:hover {
+                background: #333;
+            }
+
+        #reply-preview-bar {
+            display: none;
+            background: #141414;
+            border-left: 3px solid var(--accent);
+            padding: 10px 15px;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: -20px; /* Сливаемся с input-box */
+            z-index: 1;
+            position: relative;
+        }
+
+        .replied-msg-box {
+            background: rgba(0, 0, 0, 0.25);
+            border-left: 3px solid var(--accent);
+            padding: 6px 10px;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #ccc;
+        }
     </style>
 </head>
 <body>
@@ -483,6 +587,13 @@
         <div class="chat-area" id="chat-area">
             <div class="header" id="chat-with">Чат</div>
             <div id="messages"></div>
+            <div id="reply-preview-bar">
+                <div style="overflow: hidden; padding-right: 10px;">
+                    <div style="color: var(--accent); font-size: 12px; font-weight: bold; margin-bottom: 2px;">Ответ</div>
+                    <div id="reply-preview-text" style="font-size: 13px; color: #aaa; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;"></div>
+                </div>
+                <div onclick="cancelReply()" style="cursor: pointer; padding: 5px; color: #888;">✖</div>
+            </div>
             <div class="input-box">
                 <input type="file" id="file-input" style="display:none" onchange="uploadPhotoMsg()" accept="image/*">
                 <button onclick="document.getElementById('file-input').click()" style="background: #333; padding: 10px 15px;"> 📎 </button>
@@ -501,6 +612,21 @@
         let contactsMap = {};
         let currentProfileEditId = null;
         let isEditingProfile = false;
+        let onlineUsersSet = new Set(); // Список тех, кто онлайн
+        // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ОТВЕТОВ
+        window.currentReplyText = null;
+        window.selectedTextForMenu = "";
+
+        function updateStatusUI(userId, status) {
+            const idStr = String(userId);
+            if (status === 'online') onlineUsersSet.add(idStr);
+            else onlineUsersSet.delete(idStr);
+
+            // Меняем цвет всех точек этого пользователя
+            document.querySelectorAll(`.status-dot[data-userid="${idStr}"]`).forEach(dot => {
+                dot.className = `status-dot ${status === 'online' ? 'status-online' : 'status-offline'}`;
+            });
+        }
 
         function getAvatarHtml(name, avatarUrl, sizeClass, onclickStr = '') {
             const letter = (name || 'U').charAt(0).toUpperCase();
@@ -615,7 +741,11 @@
             }
             currentProfileEditId = userId;
             const isMe = userId === myId;
-            document.getElementById('profile-name').innerText = user.name;
+
+            // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В ПРОФИЛЬ ---
+            const isOnline = onlineUsersSet.has(String(userId));
+            document.getElementById('profile-name').innerHTML = `<span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${userId}"></span> ${user.name}`;
+
             document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(user.name, user.avatar, 'sz-lg');
             const desc = user.description || (isMe ? "У вас пока нет описания. Расскажите о себе!" : "Пользователь пока ничего не рассказал о себе.");
             document.getElementById('profile-desc-display').innerText = desc;
@@ -684,7 +814,11 @@
                     const div = document.createElement('div');
                     div.className = 'user-item';
                     const avatarHtml = getAvatarHtml(c.name, c.avatar, 'sz-sm', `openProfile(${c.id})`);
-                    div.innerHTML = `${avatarHtml} <span style="flex-grow:1;" onclick="selectChat(${c.id}, '${c.name}')">${c.name}</span>`;
+
+                    // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В СПИСОК КОНТАКТОВ ---
+                    const isOnline = onlineUsersSet.has(String(c.id));
+                    div.innerHTML = `${avatarHtml} <div style="flex-grow:1; display:flex; align-items:center; margin-left:10px;" onclick="selectChat(${c.id}, '${c.name}')"><span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${c.id}"></span> ${c.name}</div>`;
+
                     ul.appendChild(div);
                 });
             } catch (e) { console.error("Ошибка:", e); }
@@ -713,7 +847,11 @@
             const backBtnHtml = window.innerWidth <= 768 ? '<span class="back-btn" onclick="closeMobileChat()">⬅️</span>' : '';
             const friendData = contactsMap[id];
             const headerAvatar = getAvatarHtml(name, friendData?.avatar, 'sz-sm', `openProfile(${id})`);
-            document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px;">${headerAvatar} ${name}</div>`;
+
+            // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В ШАПКУ ЧАТА ---
+            const isOnline = onlineUsersSet.has(String(id));
+            document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px;">${headerAvatar} <span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${id}"></span> ${name}</div>`;
+
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
             ul.innerHTML = '';
@@ -722,7 +860,12 @@
                 const history = await res.json();
                 if (!Array.isArray(history)) return;
                 history.forEach(msg => {
-                    renderMessage({ userId: msg.sender_id, text: msg.text, type: msg.type });
+                    renderMessage({
+                        userId: msg.sender_id,
+                        text: msg.text,
+                        type: msg.type,
+                        reply_text: msg.reply_text
+                    });
                 });
             } catch (e) { console.error(e); }
         }
@@ -758,9 +901,19 @@
 
         function send() {
             const input = document.getElementById('msg-input');
-            if (input.value && currentChatId) {
-                socket.emit('chat message', { userId: myId, toId: currentChatId, text: input.value, type: 'text' });
+            if (!input || !currentChatId) return;
+
+            const text = input.value.trim();
+            if (text) {
+                socket.emit('chat message', {
+                    userId: myId,
+                    toId: currentChatId,
+                    text: text,
+                    type: 'text',
+                    replyText: window.currentReplyText // Отправляем текст цитаты
+                });
                 input.value = '';
+                cancelReply(); // Прячем панель после отправки
             }
         }
 
@@ -789,19 +942,35 @@
             const div = document.createElement('div');
             div.className = `msg-container ${isMe ? 'my-msg-container' : ''}`;
             const avatarHtml = getAvatarHtml(senderName, senderAvatarUrl, 'sz-sm', `openProfile(${data.userId})`);
+
             let contentHtml = '';
-            if (data.type === 'image') {
-                contentHtml = `<img src="${data.text}" style="max-width:100%; border-radius:10px; display:block;">`;
-            } else {
-                contentHtml = data.text;
+
+            // Отрисовка цитаты ответа над сообщением
+            if (data.reply_text) {
+                // Очищаем от HTML тегов для безопасности
+                const safeQuote = data.reply_text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                contentHtml += `<div class="replied-msg-box">${safeQuote}</div>`;
             }
+
+            let rawTextForMenu = "Фотография";
+            if (data.type === 'image') {
+                contentHtml += `<img src="${data.text}" style="max-width:100%; border-radius:10px; display:block;">`;
+            } else {
+                contentHtml += data.text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                rawTextForMenu = data.text;
+            }
+
+            // Супер-надежный способ передать текст в меню без ошибок синтаксиса
+            const safeText = encodeURIComponent(rawTextForMenu);
+
             div.innerHTML = `
-                ${avatarHtml}
-                <div class="msg ${isMe ? 'my-msg' : ''}">
-                ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
-                ${contentHtml}
-                </div>
-                `;
+        ${avatarHtml}
+        <div class="msg ${isMe ? 'my-msg' : ''}">
+            ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
+            ${contentHtml}
+            <div class="msg-dot" onclick="openMsgMenu(event, '${safeText}')">•</div>
+        </div>
+    `;
             document.getElementById('messages').appendChild(div);
             const obj = document.getElementById('messages');
             obj.scrollTop = obj.scrollHeight;
@@ -809,6 +978,49 @@
 
         document.getElementById('msg-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') send(); });
         const notifySound = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+
+        // --- ЛОГИКА МЕНЮ СООБЩЕНИЙ ---
+        function openMsgMenu(event, encodedText) {
+            event.stopPropagation();
+            window.selectedTextForMenu = decodeURIComponent(encodedText);
+            const menu = document.getElementById('msg-context-menu');
+            if (!menu) return;
+
+            menu.style.display = 'block';
+
+            let x = event.pageX;
+            let y = event.pageY;
+            // Чтобы меню не вылезало за край экрана
+            if (x + 120 > window.innerWidth) x -= 120;
+            if (y + 80 > window.innerHeight) y -= 80;
+
+            menu.style.left = `${x}px`;
+            menu.style.top = `${y}px`;
+        }
+
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('msg-context-menu');
+            if (menu) menu.style.display = 'none';
+        });
+
+        function triggerReply() {
+            window.currentReplyText = window.selectedTextForMenu;
+            const previewBar = document.getElementById('reply-preview-bar');
+            const previewText = document.getElementById('reply-preview-text');
+
+            if (previewBar && previewText) {
+                // Обрезаем длинный текст для превью
+                previewText.innerText = window.currentReplyText.length > 40 ? window.currentReplyText.substring(0, 40) + '...' : window.currentReplyText;
+                previewBar.style.display = 'flex';
+            }
+            document.getElementById('msg-input').focus();
+        }
+
+        function cancelReply() {
+            window.currentReplyText = null;
+            const previewBar = document.getElementById('reply-preview-bar');
+            if (previewBar) previewBar.style.display = 'none';
+        }
 
         socket.on('chat message', (data) => {
             if (data.userId !== myId && data.toId !== myId) return;
@@ -830,7 +1042,18 @@
                 }
             }
         });
+        socket.on('initial_online_list', (ids) => {
+            ids.forEach(id => updateStatusUI(id, 'online'));
+        });
+
+        socket.on('user_status', (data) => {
+            updateStatusUI(data.userId, data.status);
+        });
         socket.on('contact added', () => loadContacts());
     </script>
+    <div id="msg-context-menu">
+        <div class="msg-menu-item" onclick="triggerReply()">↩ Ответить</div>
+        <div class="msg-menu-item" onclick="showToast('Реакции потом!')">☻ Реакция</div>
+    </div>
 </body>
 </html>

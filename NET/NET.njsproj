@@ -29,12 +29,17 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
-    <Content Include="index.html">
+    <Content Include="..\..\Backups\Обновление с профилями\index.html">
       <SubType>Code</SubType>
+      <Link>index.html</Link>
     </Content>
-    <Content Include="server.js" />
+    <Content Include="..\..\Backups\Обновление с профилями\server.js">
+      <Link>server.js</Link>
+    </Content>
+    <Content Include="index.html" />
     <Content Include="package.json" />
     <Content Include="README.md" />
+    <Content Include="server.js" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="uploads\" />
