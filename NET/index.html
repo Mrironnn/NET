@@ -523,6 +523,18 @@
             font-size: 0.85em;
             color: #ccc;
         }
+
+        .unread-icon {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 18px;
+            margin-left: auto;
+            display: none;
+        }
+
+            .unread-icon.visible {
+                display: inline-block;
+            }
     </style>
 </head>
 <body>
@@ -605,6 +617,33 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let unreadCounts = {};
+
+        function updateUnreadUI(userId) {
+            const icon = document.getElementById(`unread-${userId}`);
+            if (icon) {
+                if (unreadCounts[userId] > 0) icon.classList.add('visible');
+                else icon.classList.remove('visible');
+            }
+        }
+
+        const messageObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && entry.target.classList.contains('unread-msg')) {
+                    const msgNode = entry.target;
+                    const msgId = msgNode.dataset.msgId;
+                    const senderId = msgNode.dataset.senderId;
+
+                    msgNode.classList.remove('unread-msg'); // Убираем класс, чтобы не считывать дважды
+                    if (msgId) socket.emit('mark_read', msgId); // Говорим серверу, что прочитано
+
+                    if (unreadCounts[senderId] > 0) {
+                        unreadCounts[senderId]--;
+                        updateUnreadUI(senderId); // Обновляем восклицательный знак
+                    }
+                }
+            });
+        }, { root: document.getElementById('messages'), threshold: 0.5 });
         let myId, myName, myCode, currentChatId = null;
         let myAvatar = '';
         let myDescription = '';
@@ -719,13 +758,17 @@
             startApp();
         }
 
-        function startApp() {
+        async function startApp() {
             document.getElementById('main-app').style.display = 'flex';
             document.getElementById('my-code-display').innerText = myCode;
             document.getElementById('my-name-display').innerText = myName;
             document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
+
             socket.emit('join', myId);
-            loadContacts();
+
+            await loadContacts();
+            socket.emit('get_unread_status', myId);
+
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 Notification.requestPermission();
             }
@@ -817,10 +860,12 @@
 
                     // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В СПИСОК КОНТАКТОВ ---
                     const isOnline = onlineUsersSet.has(String(c.id));
-                    div.innerHTML = `${avatarHtml} <div style="flex-grow:1; display:flex; align-items:center; margin-left:10px;" onclick="selectChat(${c.id}, '${c.name}')"><span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${c.id}"></span> ${c.name}</div>`;
+                    div.innerHTML = `${avatarHtml} <div style="flex-grow:1; display:flex; align-items:center; margin-left:10px;" onclick="selectChat(${c.id}, '${c.name}')"><span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${c.id}"></span> ${c.name}</div><span class="unread-icon" id="unread-${c.id}">!</span>`;
 
                     ul.appendChild(div);
+                    updateUnreadUI(c.id);
                 });
+                Object.keys(unreadCounts).forEach(userId => updateUnreadUI(userId));
             } catch (e) { console.error("Ошибка:", e); }
         }
 
@@ -861,10 +906,12 @@
                 if (!Array.isArray(history)) return;
                 history.forEach(msg => {
                     renderMessage({
+                        id: msg.id,           // Добавили ID из базы
                         userId: msg.sender_id,
                         text: msg.text,
                         type: msg.type,
-                        reply_text: msg.reply_text
+                        reply_text: msg.reply_text,
+                        is_read: msg.is_read  // Добавили статус прочтения
                     });
                 });
             } catch (e) { console.error(e); }
@@ -941,6 +988,15 @@
             }
             const div = document.createElement('div');
             div.className = `msg-container ${isMe ? 'my-msg-container' : ''}`;
+            // Добавляем данные для отслеживания прочтения
+            div.dataset.msgId = data.id;
+            div.dataset.senderId = data.userId;
+
+            // Если сообщение не от нас и не прочитано - начинаем за ним следить
+            if (!isMe && data.is_read === 0) {
+                div.classList.add('unread-msg');
+                messageObserver.observe(div);
+            }
             const avatarHtml = getAvatarHtml(senderName, senderAvatarUrl, 'sz-sm', `openProfile(${data.userId})`);
 
             let contentHtml = '';
@@ -964,13 +1020,13 @@
             const safeText = encodeURIComponent(rawTextForMenu);
 
             div.innerHTML = `
-        ${avatarHtml}
-        <div class="msg ${isMe ? 'my-msg' : ''}">
-            ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
-            ${contentHtml}
-            <div class="msg-dot" onclick="openMsgMenu(event, '${safeText}')">•</div>
-        </div>
-    `;
+                ${avatarHtml}
+                <div class="msg ${isMe ? 'my-msg' : ''}">
+                    ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
+                    ${contentHtml}
+                    <div class="msg-dot" onclick="openMsgMenu(event, '${safeText}')">•</div>
+                </div>
+            `;
             document.getElementById('messages').appendChild(div);
             const obj = document.getElementById('messages');
             obj.scrollTop = obj.scrollHeight;
@@ -1027,17 +1083,26 @@
             const isCurrentChat = (data.userId === myId && data.toId === currentChatId) || (data.userId === currentChatId && data.toId === myId);
             if (isCurrentChat) renderMessage(data);
             if (data.toId === myId && data.userId !== myId) {
-                if (document.hidden || !isCurrentChat) {
+                if (data.toId === myId && data.userId !== myId) {
                     const friendName = contactsMap[data.userId]?.name || 'User';
                     const msgSnippet = data.type === 'image' ? ' 🖼 ️ Фотография' : data.text;
-                    if (document.hidden && typeof notifySound !== 'undefined') {
-                        notifySound.play().catch(e => console.log("Sound error"));
+
+                    // Если это не открытый чат — считаем непрочитанным
+                    if (!isCurrentChat) {
+                        unreadCounts[data.userId] = (unreadCounts[data.userId] || 0) + 1;
+                        updateUnreadUI(data.userId);
+                        showToast(friendName, msgSnippet);
                     }
-                    if (!isCurrentChat) showToast(friendName, msgSnippet);
+
+                    // Уведомление ОС — только когда вкладка скрыта
                     if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
                         const notif = new Notification(`Новое сообщение от ${friendName}`, { body: msgSnippet });
                         setTimeout(() => notif.close(), 5000);
                         notif.onclick = () => { window.focus(); notif.close(); };
+                    }
+
+                    if (document.hidden && typeof notifySound !== 'undefined') {
+                        notifySound.play().catch(e => console.log("Sound error"));
                     }
                 }
             }
@@ -1050,6 +1115,10 @@
             updateStatusUI(data.userId, data.status);
         });
         socket.on('contact added', () => loadContacts());
+        socket.on('unread_status_data', (data) => {
+            unreadCounts = data;
+            for (let userId in data) updateUnreadUI(userId);
+        });
     </script>
     <div id="msg-context-menu">
         <div class="msg-menu-item" onclick="triggerReply()">↩ Ответить</div>

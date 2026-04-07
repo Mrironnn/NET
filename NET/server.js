@@ -28,9 +28,15 @@ db.serialize(() => {
     db.run("CREATE TABLE IF NOT EXISTS contacts (id INTEGER PRIMARY KEY, user_id INTEGER, contact_id INTEGER)");
 
     // Безопасное добавление колонки для ответов
+    // Безопасное добавление колонок для ответов и статуса прочтения
     db.all("PRAGMA table_info(messages)", (err, rows) => {
         const cols = rows.map(r => r.name);
-        if (!cols.includes('reply_text')) db.run("ALTER TABLE messages ADD COLUMN reply_text TEXT DEFAULT NULL");
+        if (!cols.includes('reply_text')) {
+            db.run("ALTER TABLE messages ADD COLUMN reply_text TEXT DEFAULT NULL");
+        }
+        if (!cols.includes('is_read')) {
+            db.run("ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0");
+        }
     });
 });
 const storage = multer.diskStorage({
@@ -152,23 +158,40 @@ io.on('connection', (socket) => {
         const msgType = data.type === 'image' ? 'image' : 'text';
         const replyText = data.replyText || null; // Ловим ответ
 
-        db.run("INSERT INTO messages (sender_id, receiver_id, text, type, reply_text) VALUES (?, ?, ?, ?, ?)",
+        // Добавили is_read в запрос
+        db.run("INSERT INTO messages (sender_id, receiver_id, text, type, reply_text, is_read) VALUES (?, ?, ?, ?, ?, 0)",
             [data.userId, data.toId, data.text, msgType, replyText], function (err) {
                 if (err) {
                     console.error("Ошибка сохранения сообщения:", err);
                 } else {
-                    // Возвращаем сообщение обратно с полем reply_text
                     io.to(String(data.userId)).to(String(data.toId)).emit('chat message', {
+                        id: this.lastID, // ТЕПЕРЬ МЫ ПЕРЕДАЕМ ID ИЗ БАЗЫ
                         userId: data.userId,
                         toId: data.toId,
                         text: data.text,
                         type: msgType,
-                        reply_text: replyText
+                        reply_text: replyText,
+                        is_read: 0 // И СТАТУС ПРОЧТЕНИЯ
                     });
                 }
             });
     });
 
+    // Пометка сообщения как прочитанного
+    socket.on('mark_read', (msgId) => {
+        db.run("UPDATE messages SET is_read = 1 WHERE id = ?", [msgId]);
+    });
+
+    // Получение количества непрочитанных
+    socket.on('get_unread_status', (userId) => {
+        db.all("SELECT sender_id, COUNT(*) as count FROM messages WHERE receiver_id = ? AND is_read = 0 GROUP BY sender_id", [userId], (err, rows) => {
+            if (!err) {
+                const unreadData = {};
+                rows.forEach(r => unreadData[r.sender_id] = r.count);
+                socket.emit('unread_status_data', unreadData);
+            }
+        });
+    });
     // Логика отключения (закрыл сайт)
     socket.on('disconnect', () => {
         if (socket.userId) {
