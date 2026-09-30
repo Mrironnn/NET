@@ -132,6 +132,12 @@
             border-radius: 12px;
             border: 1px solid #222;
             word-wrap: break-word;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            white-space: pre-wrap;
+            width: fit-content; /* Облегает короткий текст */
+            max-width: 100%; /* Защищает от вылезания за края */
+            box-sizing: border-box;
         }
 
         .my-msg {
@@ -488,7 +494,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.6);
             min-width: 120px;
         }
-
         .msg-menu-item {
             padding: 10px 15px;
             cursor: pointer;
@@ -535,6 +540,158 @@
             .unread-icon.visible {
                 display: inline-block;
             }
+
+        /* Стили для вкладок профиля/друзей */
+        .profile-tabs {
+            display: flex;
+            border-bottom: 1px solid #333;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 16px;
+            outline: none;
+        }
+
+            .tab-btn.active {
+                color: var(--accent);
+                border-bottom: 2px solid var(--accent);
+                font-weight: bold;
+            }
+
+        #tab-friends {
+            display: none;
+        }
+        /* Скрыто по умолчанию */
+        #requests-list {
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .req-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #333;
+        }
+
+        .req-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .req-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .req-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            transition: 0.2s;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .req-btn:hover {
+                transform: scale(1.2);
+            }
+
+        .req-accept {
+            color: #4CAF50;
+        }
+
+        .req-reject {
+            color: #f44336;
+        }
+
+        /* Компактные фото в чате */
+        .chat-img {
+            max-width: 220px;
+            max-height: 250px;
+            border-radius: 8px;
+            display: block;
+            cursor: pointer;
+            object-fit: cover;
+            margin-top: 5px;
+            transition: opacity 0.2s;
+        }
+
+            .chat-img:hover {
+                opacity: 0.8;
+            }
+
+        /* Полноэкранный просмотр фото */
+        #photo-viewer {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+            #photo-viewer img {
+                max-width: 90vw;
+                max-height: 90vh;
+                border-radius: 8px;
+                object-fit: contain;
+                cursor: pointer;
+            }
+
+        /* Реакции */
+        .reactions-bar {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+
+        .react-badge {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 11px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+            .react-badge.my-react {
+                background: rgba(0, 120, 212, 0.3);
+                border-color: var(--accent);
+            }
+
+        #emoji-picker span {
+            transition: transform 0.1s;
+        }
+
+            #emoji-picker span:hover {
+                transform: scale(1.3);
+            }
     </style>
 </head>
 <body>
@@ -562,20 +719,31 @@
         </div>
     </div>
     <div id="profile-modal" class="profile-modal" onclick="closeProfile(event)">
-        <div class="profile-card" onclick="event.stopPropagation()">
-            <div style="position: relative; display: inline-block;">
-                <div id="profile-avatar-container"></div>
-                <div id="edit-avatar-btn" class="edit-avatar-badge" onclick="document.getElementById('prof-avatar-input').click()"> 📷 </div>
-                <input type="file" id="prof-avatar-input" style="display:none" onchange="updateProfileAvatar()" accept="image/*">
+        <div class="profile-card" onclick="event.stopPropagation()" style="width: 350px;">
+            <div class="profile-tabs">
+                <button id="btn-tab-profile" class="tab-btn active" onclick="switchTab('profile')">Профиль</button>
+                <button id="btn-tab-friends" class="tab-btn" onclick="switchTab('friends')">Друзья <span id="req-badge" style="display:none; background:red; color:white; border-radius:50%; padding:2px 6px; font-size:12px; margin-left:5px;">0</span></button>
             </div>
-            <h2 id="profile-name" class="profile-name">Имя</h2>
-            <div id="profile-desc-display" class="profile-desc"></div>
-            <textarea id="profile-desc-input" class="profile-desc-edit" placeholder="Напишите немного о себе..."></textarea>
-            <div id="profile-edit-controls" class="edit-controls">
-                <button onclick="toggleEditMode()" style="background:#333;">Отмена</button>
-                <button onclick="saveProfileChanges()">Сохранить</button>
+            <div id="tab-profile">
+                <div style="position: relative; display: inline-block;">
+                    <div id="profile-avatar-container"></div>
+                    <div id="edit-avatar-btn" class="edit-avatar-badge" onclick="document.getElementById('prof-avatar-input').click()"> 📷 </div>
+                    <input type="file" id="prof-avatar-input" style="display:none" onchange="updateProfileAvatar()" accept="image/*">
+                </div>
+                <h2 id="profile-name" class="profile-name">Имя</h2>
+                <div id="profile-desc-display" class="profile-desc"></div>
+                <textarea id="profile-desc-input" class="profile-desc-edit" placeholder="Напишите немного о себе..."></textarea>
+                <div style="margin-top: 15px; color: var(--accent); font-weight: bold; user-select: text;">Мой код: <span id="profile-code-display"></span></div>
+                <div id="profile-edit-controls" class="edit-controls">
+                    <button onclick="toggleEditMode()" style="background:#333;">Отмена</button>
+                    <button onclick="saveProfileChanges()">Сохранить</button>
+                </div>
+                <button id="profile-start-edit-btn" onclick="toggleEditMode()" style="margin-top:15px; width:100%; display:none;">Редактировать описание</button>
             </div>
-            <button id="profile-start-edit-btn" onclick="toggleEditMode()" style="margin-top:15px; width:100%; display:none;">Редактировать описание</button>
+            <div id="tab-friends">
+                <div id="requests-list">
+                </div>
+            </div>
         </div>
     </div>
     <div id="main-app">
@@ -667,12 +835,19 @@
             });
         }
 
+        // Вычисление аббревиатуры (до двух букв)
+        function getInitials(name) {
+            if (!name) return 'U';
+            const parts = name.trim().split(/\s+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+            return name.charAt(0).toUpperCase();
+        }
+
         function getAvatarHtml(name, avatarUrl, sizeClass, onclickStr = '') {
-            const letter = (name || 'U').charAt(0).toUpperCase();
             if (avatarUrl && avatarUrl.trim() !== '') {
                 return `<img src="${avatarUrl}" class="avatar-img ${sizeClass}" ${onclickStr ? `onclick="${onclickStr}"` : ''}>`;
             }
-            return `<div class="avatar-circle ${sizeClass}" ${onclickStr ? `onclick="${onclickStr}"` : ''}>${letter}</div>`;
+            return `<div class="avatar-circle ${sizeClass}" ${onclickStr ? `onclick="${onclickStr}"` : ''}>${getInitials(name)}</div>`;
         }
 
         window.onload = async () => {
@@ -717,8 +892,7 @@
             const data = await res.json();
             if (res.ok) {
                 myId = data.id; myCode = data.code;
-                localStorage.setItem('net_session_token', data.token); // Сохраняем ТОКЕН
-
+                localStorage.setItem('net_session_token', data.token);
                 document.getElementById('auth-modal').style.display = 'none';
                 if (isReg) {
                     document.getElementById('name-modal').style.display = 'flex';
@@ -727,7 +901,12 @@
                     startApp();
                 }
             } else {
-                showToast("Ошибка", data.error);
+                // Переводчик ошибок от сервера
+                let errText = "Ошибка системы";
+                if (data.error === 'email_taken') errText = "Этот Email уже занят";
+                if (data.error === 'user_not_found') errText = "Пользователь не найден";
+                if (data.error === 'wrong_password') errText = "Неверный пароль";
+                showToast("Внимание", errText);
             }
         }
 
@@ -748,7 +927,15 @@
         }
 
         async function saveInitProfile() {
-            myName = document.getElementById('new-name').value || "User";
+            const nameInput = document.getElementById('new-name').value.trim();
+
+            // Если поле пустое - выдаем ошибку и останавливаем регистрацию
+            if (!nameInput) {
+                showToast("Внимание", "Имя не может быть пустым!");
+                return;
+            }
+
+            myName = nameInput;
             myAvatar = tempRegAvatarUrl;
             await fetch('/update-profile-init', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -761,14 +948,15 @@
         async function startApp() {
             document.getElementById('main-app').style.display = 'flex';
             document.getElementById('my-code-display').innerText = myCode;
+            document.getElementById('profile-code-display').innerText = myCode;
             document.getElementById('my-name-display').innerText = myName;
+
+            // Заставляем систему отрисовать твою аватарку или сгенерировать 2 буквы в левом верхнем углу
             document.getElementById('my-avatar-display').innerHTML = getAvatarHtml(myName, myAvatar, 'sz-sm');
 
             socket.emit('join', myId);
-
             await loadContacts();
             socket.emit('get_unread_status', myId);
-
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 Notification.requestPermission();
             }
@@ -779,26 +967,40 @@
             const res = await fetch(`/profile/${userId}`);
             const user = await res.json();
             if (user.error) {
-                showToast("Ошибка", "Ошибка загрузки профиля");
+                showToast("Ошибка", user.error === 'user_not_found' ? "Пользователь не найден" : "Ошибка загрузки");
                 return;
             }
             currentProfileEditId = userId;
             const isMe = userId === myId;
-
-            // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В ПРОФИЛЬ ---
             const isOnline = onlineUsersSet.has(String(userId));
             document.getElementById('profile-name').innerHTML = `<span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${userId}"></span> ${user.name}`;
-
             document.getElementById('profile-avatar-container').innerHTML = getAvatarHtml(user.name, user.avatar, 'sz-lg');
             const desc = user.description || (isMe ? "У вас пока нет описания. Расскажите о себе!" : "Пользователь пока ничего не рассказал о себе.");
             document.getElementById('profile-desc-display').innerText = desc;
             document.getElementById('profile-desc-input').value = user.description || '';
+
+            const codeDisplay = document.getElementById('profile-code-display');
+            if (codeDisplay) {
+                codeDisplay.innerText = isMe ? myCode : 'Скрыт';
+                codeDisplay.parentElement.style.display = isMe ? 'block' : 'none';
+            }
             document.getElementById('edit-avatar-btn').style.display = isMe ? 'flex' : 'none';
             document.getElementById('profile-start-edit-btn').style.display = isMe ? 'block' : 'none';
             isEditingProfile = false;
             document.getElementById('profile-desc-display').style.display = 'block';
             document.getElementById('profile-desc-input').style.display = 'none';
             document.getElementById('profile-edit-controls').style.display = 'none';
+
+            // Настройка вкладок
+            const tabFriendsBtn = document.getElementById('btn-tab-friends');
+            if (isMe) {
+                tabFriendsBtn.innerHTML = `Запросы <span id="req-badge" style="display:none; background:red; color:white; border-radius:50%; padding:2px 6px; font-size:12px; margin-left:5px;">0</span>`;
+                loadFriendRequests(true);
+            } else {
+                tabFriendsBtn.innerHTML = `Общие друзья`;
+            }
+
+            switchTab('profile'); // Переключаем на профиль
             document.getElementById('profile-modal').classList.add('show');
         }
 
@@ -869,22 +1071,32 @@
             } catch (e) { console.error("Ошибка:", e); }
         }
 
-        async function addFriend() {
-            const code = document.getElementById('friend-code').value.toUpperCase();
+        function addFriend() {
+            const code = document.getElementById('friend-code').value.trim();
             if (!code) return;
-            try {
-                const res = await fetch('/add-contact', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: myId, code })
-                });
-                if (res.ok) {
-                    document.getElementById('friend-code').value = '';
-                    loadContacts();
-                } else {
-                    const errObj = await res.json();
-                    showToast("Внимание", errObj.error || "Ошибка добавления"); // Избавились от alert
-                }
-            } catch (e) { showToast("Ошибка", "Проверьте подключение"); }
+            fetch('/add_contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('net_session_token') },
+                body: JSON.stringify({ code })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('friend-code').value = '';
+                        showToast('Система', 'Запрос отправлен!');
+                    } else {
+                        // Переводим ошибки с сервера на нормальный русский
+                        let errorMsg = 'Ошибка системы';
+                        if (data.error === 'not_found') errorMsg = 'Код друга не найден';
+                        if (data.error === 'self') errorMsg = 'Нельзя добавить самого себя';
+                        if (data.error === 'already_friends') errorMsg = 'Вы уже друзья';
+                        if (data.error === 'already_sent') errorMsg = 'Запрос уже отправлен';
+                        if (data.error === 'unauthorized') errorMsg = 'Ошибка авторизации';
+
+                        showToast('Внимание', errorMsg);
+                    }
+                })
+                .catch(err => showToast('Ошибка', 'Проверьте подключение'));
         }
 
         async function selectChat(id, name) {
@@ -988,46 +1200,50 @@
             }
             const div = document.createElement('div');
             div.className = `msg-container ${isMe ? 'my-msg-container' : ''}`;
-            // Добавляем данные для отслеживания прочтения
             div.dataset.msgId = data.id;
             div.dataset.senderId = data.userId;
-
-            // Если сообщение не от нас и не прочитано - начинаем за ним следить
             if (!isMe && data.is_read === 0) {
                 div.classList.add('unread-msg');
                 messageObserver.observe(div);
             }
             const avatarHtml = getAvatarHtml(senderName, senderAvatarUrl, 'sz-sm', `openProfile(${data.userId})`);
 
-            let contentHtml = '';
+            // Обработка времени сообщения
+            let timeStr = "";
+            if (data.timestamp) {
+                let dateObj = new Date(data.timestamp.includes('Z') ? data.timestamp : data.timestamp + "Z");
+                if (!isNaN(dateObj)) timeStr = `${dateObj.getHours().toString().padStart(2, '0')}:${dateObj.getMinutes().toString().padStart(2, '0')}`;
+            }
+            if (!timeStr) {
+                let d = new Date();
+                timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }
 
-            // Отрисовка цитаты ответа над сообщением
+            let contentHtml = '';
             if (data.reply_text) {
-                // Очищаем от HTML тегов для безопасности
                 const safeQuote = data.reply_text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 contentHtml += `<div class="replied-msg-box">${safeQuote}</div>`;
             }
-
             let rawTextForMenu = "Фотография";
             if (data.type === 'image') {
-                contentHtml += `<img src="${data.text}" style="max-width:100%; border-radius:10px; display:block;">`;
+                // Компактные фото с вызовом полноэкранного окна
+                contentHtml += `<img src="${data.text}" class="chat-img" onclick="document.getElementById('photo-viewer-img').src=this.src; document.getElementById('photo-viewer').style.display='flex';">`;
             } else {
                 contentHtml += data.text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 rawTextForMenu = data.text;
             }
+            const safeText = encodeURIComponent(rawTextForMenu).replace(/'/g, "%27");
 
-            // Супер-надежный способ передать текст в меню без ошибок синтаксиса
-            const safeText = encodeURIComponent(rawTextForMenu);
-
+            // Сборка сообщения в единую линию, чтобы не было пустых отступов
             div.innerHTML = `
-                ${avatarHtml}
-                <div class="msg ${isMe ? 'my-msg' : ''}">
-                    ${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}
-                    ${contentHtml}
-                    <div class="msg-dot" onclick="openMsgMenu(event, '${safeText}')">•</div>
-                </div>
-            `;
+                        ${avatarHtml}
+                        <div class="msg ${isMe ? 'my-msg' : ''}">${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}${contentHtml}<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:4px; gap:15px;"><div class="reactions-bar" id="reacts-${data.id}"></div><div style="font-size:0.7em; color:#888; text-align:right; margin-bottom:-4px; white-space:nowrap;">${timeStr}</div></div><div class="msg-dot" onclick="openMsgMenu(event, '${safeText}', ${data.id})">•</div></div>
+                    `;
             document.getElementById('messages').appendChild(div);
+
+            // Если с сервера пришли реакции - сразу рисуем их
+            if (data.reactions) renderReactions(data.id, data.reactions);
+
             const obj = document.getElementById('messages');
             obj.scrollTop = obj.scrollHeight;
         }
@@ -1119,10 +1335,206 @@
             unreadCounts = data;
             for (let userId in data) updateUnreadUI(userId);
         });
+
+        socket.on('friend_request', (data) => {
+            showToast('Запрос дружбы', `${data.fromName} хочет стать вашим другом`);
+            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+                new Notification('Запрос дружбы', { body: `${data.fromName} хочет добавить вас в друзья` });
+            }
+            if (typeof notifySound !== 'undefined') notifySound.play().catch(e => console.log(e));
+
+            // Если модалка открыта прямо сейчас - обновляем список или бейдж
+            if (document.getElementById('profile-modal').style.display === 'flex') {
+                loadFriendRequests();
+            }
+        });
+
+        // --- ЛОГИКА ВКЛАДОК И ЗАПРОСОВ ---
+        function switchTab(tabId) {
+            document.getElementById('tab-profile').style.display = tabId === 'profile' ? 'block' : 'none';
+            document.getElementById('tab-friends').style.display = tabId === 'friends' ? 'block' : 'none';
+            document.getElementById('btn-tab-profile').className = tabId === 'profile' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('btn-tab-friends').className = tabId === 'friends' ? 'tab-btn active' : 'tab-btn';
+
+            if (tabId === 'friends') loadFriendRequests();
+        }
+
+        function switchTab(tabId) {
+            document.getElementById('tab-profile').style.display = tabId === 'profile' ? 'block' : 'none';
+            document.getElementById('tab-friends').style.display = tabId === 'friends' ? 'block' : 'none';
+            document.getElementById('btn-tab-profile').className = tabId === 'profile' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('btn-tab-friends').className = tabId === 'friends' ? 'tab-btn active' : 'tab-btn';
+
+            if (tabId === 'friends') {
+                if (currentProfileEditId === myId) {
+                    loadFriendRequests();
+                } else {
+                    loadMutualFriends(currentProfileEditId);
+                }
+            }
+        }
+
+        function loadMutualFriends(otherUserId) {
+            fetch(`/mutual_friends?other_id=${otherUserId}`, { headers: { 'Authorization': localStorage.getItem('net_session_token') } })
+                .then(res => res.json())
+                .then(friends => {
+                    const list = document.getElementById('requests-list');
+                    list.innerHTML = '';
+                    if (friends.length === 0) {
+                        list.innerHTML = '<div style="color:#888; margin-top:20px;">Нет общих друзей</div>';
+                        return;
+                    }
+                    friends.forEach(f => {
+                        const avatarSrc = f.avatar ? f.avatar : 'https://via.placeholder.com/40/333/fff?text=' + f.name[0];
+                        list.innerHTML += `
+                                    <div class="req-item" onclick="openProfile(${f.id})" style="cursor:pointer; justify-content: flex-start; gap: 15px;">
+                                        <img src="${avatarSrc}" class="req-avatar">
+                                        <div style="font-weight:bold;">${f.name}</div>
+                                    </div>
+                                `;
+                    });
+                })
+                .catch(() => showToast('Ошибка', 'Не удалось загрузить друзей'));
+        }
+
+        function loadFriendRequests(onlyBadge = false) {
+            fetch('/friend_requests', { headers: { 'Authorization': localStorage.getItem('net_session_token') } })
+                .then(res => res.json())
+                .then(reqs => {
+                    const badge = document.getElementById('req-badge');
+                    if (reqs.length > 0) {
+                        badge.style.display = 'inline-block';
+                        badge.innerText = reqs.length;
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    if (onlyBadge) return; // Если просили только обновить бейдж, выходим
+
+                    const list = document.getElementById('requests-list');
+                    list.innerHTML = '';
+                    if (reqs.length === 0) {
+                        list.innerHTML = '<div style="color:#888; margin-top:20px;">Нет новых запросов</div>';
+                        return;
+                    }
+
+                    reqs.forEach(req => {
+                        const avatarSrc = req.avatar ? req.avatar : 'https://via.placeholder.com/40/333/fff?text=' + req.name[0];
+                        list.innerHTML += `
+                                    <div class="req-item" id="req-${req.req_id}">
+                                        <div class="req-info">
+                                            <img src="${avatarSrc}" class="req-avatar">
+                                            <div style="text-align: left;">
+                                                <div style="font-weight:bold;">${req.name}</div>
+                                                <div style="font-size:12px; color:#888;">хочет дружить</div>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; gap:5px;">
+                                            <button class="req-btn req-accept" onclick="handleReq(${req.req_id}, 'accept')">✔</button>
+                                            <button class="req-btn req-reject" onclick="handleReq(${req.req_id}, 'reject')">✖</button>
+                                        </div>
+                                    </div>
+                                `;
+                    });
+                });
+        }
+
+        function handleReq(reqId, action) {
+            fetch('/handle_request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('net_session_token') },
+                body: JSON.stringify({ req_id: reqId, action })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        loadFriendRequests(); // Перезагружаем список
+                        if (action === 'accept') showToast('Система', 'Запрос принят!');
+                    }
+                });
+        }
+
+        // --- РЕАКЦИИ ---
+        let contextMsgId = null;
+
+        // Перезаписываем старую функцию меню, чтобы она запоминала ID сообщения
+        function openMsgMenu(event, encodedText, msgId) {
+            event.stopPropagation();
+            window.selectedTextForMenu = decodeURIComponent(encodedText);
+            contextMsgId = msgId;
+            const menu = document.getElementById('msg-context-menu');
+            if (!menu) return;
+            menu.style.display = 'block';
+            let x = event.pageX; let y = event.pageY;
+            if (x + 120 > window.innerWidth) x -= 120;
+            if (y + 80 > window.innerHeight) y -= 80;
+            menu.style.left = `${x}px`; menu.style.top = `${y}px`;
+        }
+
+        function showEmojiPicker(event) {
+            event.stopPropagation();
+            document.getElementById('msg-context-menu').style.display = 'none';
+            const picker = document.getElementById('emoji-picker');
+            picker.style.display = 'flex';
+            picker.style.left = (event.pageX - 50) + 'px';
+            picker.style.top = event.pageY + 'px';
+        }
+
+        function sendReaction(emoji, overrideMsgId = null) {
+            const id = overrideMsgId || contextMsgId;
+            if (id) socket.emit('add_reaction', { msgId: id, emoji: emoji, userId: myId });
+            document.getElementById('emoji-picker').style.display = 'none';
+        }
+
+        function renderReactions(msgId, reactsObj) {
+            const bar = document.getElementById(`reacts-${msgId}`);
+            if (!bar) return;
+            if (typeof reactsObj === 'string') {
+                try { reactsObj = JSON.parse(reactsObj); } catch (e) { reactsObj = {}; }
+            }
+            const counts = {}; const myReacts = new Set();
+            for (let uid in reactsObj) {
+                const em = reactsObj[uid];
+                counts[em] = (counts[em] || 0) + 1;
+                if (String(uid) === String(myId)) myReacts.add(em);
+            }
+            bar.innerHTML = '';
+            for (let em in counts) {
+                const isMine = myReacts.has(em);
+                bar.innerHTML += `<div class="react-badge ${isMine ? 'my-react' : ''}" onclick="sendReaction('${em}', ${msgId})">${em} ${counts[em]}</div>`;
+            }
+        }
+
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('msg-context-menu');
+            const picker = document.getElementById('emoji-picker');
+            if (menu) menu.style.display = 'none';
+            if (picker) picker.style.display = 'none';
+        });
+
+        socket.on('reaction_updated', (data) => renderReactions(data.msgId, data.reacts));
+
     </script>
+
     <div id="msg-context-menu">
         <div class="msg-menu-item" onclick="triggerReply()">↩ Ответить</div>
-        <div class="msg-menu-item" onclick="showToast('Реакции потом!')">☻ Реакция</div>
+        <div class="msg-menu-item" onclick="showEmojiPicker(event)">☻ Реакция</div>
     </div>
+
+    <!-- Панель выбора эмодзи -->
+    <div id="emoji-picker" style="display:none; position:fixed; background:#222; border:1px solid #444; border-radius:8px; padding:8px; z-index:1001; gap:8px; font-size:20px; cursor:pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+        <span onclick="sendReaction('👍')">👍</span>
+        <span onclick="sendReaction('❤️')">❤️</span>
+        <span onclick="sendReaction('😂')">😂</span>
+        <span onclick="sendReaction('🔥')">🔥</span>
+        <span onclick="sendReaction('😢')">😢</span>
+        <span onclick="sendReaction('👎')">👎</span>
+    </div>
+
+    <!-- Модалка просмотра фото -->
+    <div id="photo-viewer" onclick="this.style.display='none'">
+        <img id="photo-viewer-img">
+    </div>
+
 </body>
 </html>
