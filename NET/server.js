@@ -52,6 +52,12 @@ app.post('/upload', upload.single('photo'), (req, res) => {
 
 app.post('/register', async (req, res) => {
     const { email, password } = req.body;
+
+    // феярйюъ акнйхпнбйю осяршу онкеи
+    if (!email || !password || email.trim() === '' || password.trim() === '') {
+        return res.status(400).json({ error: "empty_fields" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const code = crypto.randomBytes(3).toString('hex').toUpperCase();
     const token = crypto.randomBytes(16).toString('hex');

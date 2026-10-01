@@ -56,7 +56,14 @@
             border-right: 1px solid #222;
             display: flex;
             flex-direction: column;
+            overflow-y: auto; /* Включаем вертикальную прокрутку */
         }
+
+            /* Прячем уродливый стандартный ползунок прокрутки для красоты (в WebKit браузерах) */
+            .sidebar::-webkit-scrollbar {
+                width: 0px;
+                background: transparent;
+            }
 
         .chat-area {
             flex-grow: 1;
@@ -866,7 +873,13 @@
                     myAvatar = status.user.avatar || '';
                     myDescription = status.user.description || '';
                     document.getElementById('auth-modal').style.display = 'none';
-                    startApp();
+
+                    // Если имя пустое или записалось как "null" - принудительно возвращаем на окно создания профиля
+                    if (!myName || myName === 'null') {
+                        document.getElementById('name-modal').style.display = 'flex';
+                    } else {
+                        startApp();
+                    }
                 } else {
                     localStorage.removeItem('net_session_token');
                 }
@@ -906,6 +919,7 @@
                 if (data.error === 'email_taken') errText = "Этот Email уже занят";
                 if (data.error === 'user_not_found') errText = "Пользователь не найден";
                 if (data.error === 'wrong_password') errText = "Неверный пароль";
+                if (data.error === 'empty_fields') errText = "Заполните все поля!";
                 showToast("Внимание", errText);
             }
         }
@@ -1104,10 +1118,10 @@
             const backBtnHtml = window.innerWidth <= 768 ? '<span class="back-btn" onclick="closeMobileChat()">⬅️</span>' : '';
             const friendData = contactsMap[id];
             const headerAvatar = getAvatarHtml(name, friendData?.avatar, 'sz-sm', `openProfile(${id})`);
-
-            // --- ДОБАВЛЕНА ТОЧКА ОНЛАЙНА В ШАПКУ ЧАТА ---
             const isOnline = onlineUsersSet.has(String(id));
-            document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px;">${headerAvatar} <span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${id}"></span> ${name}</div>`;
+
+            // ДОБАВЛЕНА КНОПКА ГАЛЕРЕИ В ШАПКУ
+            document.getElementById('chat-with').innerHTML = `${backBtnHtml} <div style="display:flex; align-items:center; gap:10px; flex-grow:1;">${headerAvatar} <span class="status-dot ${isOnline ? 'status-online' : 'status-offline'}" data-userid="${id}"></span> ${name}</div> <span onclick="openMediaGallery()" style="cursor:pointer; font-size:1.2em; color:var(--accent); padding:0 10px;">❯</span>`;
 
             document.getElementById('chat-area').style.visibility = 'visible';
             const ul = document.getElementById('messages');
@@ -1118,12 +1132,13 @@
                 if (!Array.isArray(history)) return;
                 history.forEach(msg => {
                     renderMessage({
-                        id: msg.id,           // Добавили ID из базы
+                        id: msg.id,
                         userId: msg.sender_id,
                         text: msg.text,
                         type: msg.type,
                         reply_text: msg.reply_text,
-                        is_read: msg.is_read  // Добавили статус прочтения
+                        is_read: msg.is_read,
+                        reactions: msg.reactions // ИСПРАВЛЕНИЕ: Теперь мы передаем реакции при загрузке истории!
                     });
                 });
             } catch (e) { console.error(e); }
@@ -1236,9 +1251,9 @@
 
             // Сборка сообщения в единую линию, чтобы не было пустых отступов
             div.innerHTML = `
-                        ${avatarHtml}
-                        <div class="msg ${isMe ? 'my-msg' : ''}">${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}${contentHtml}<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:4px; gap:15px;"><div class="reactions-bar" id="reacts-${data.id}"></div><div style="font-size:0.7em; color:#888; text-align:right; margin-bottom:-4px; white-space:nowrap;">${timeStr}</div></div><div class="msg-dot" onclick="openMsgMenu(event, '${safeText}', ${data.id})">•</div></div>
-                    `;
+                                ${avatarHtml}
+                                <div class="msg ${isMe ? 'my-msg' : ''}">${isMe ? '' : `<strong style="font-size:0.8em; color:var(--accent); display:block; margin-bottom:3px;">${senderName}</strong>`}${contentHtml}<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:4px; gap:15px;"><div class="reactions-bar" id="reacts-${data.id}"></div><div style="font-size:0.7em; color:#888; text-align:right; margin-bottom:-4px; white-space:nowrap;">${timeStr}</div></div><div class="msg-dot" onclick="openMsgMenu(event, '${safeText}', ${data.id})">•</div></div>
+                            `;
             document.getElementById('messages').appendChild(div);
 
             // Если с сервера пришли реакции - сразу рисуем их
@@ -1387,11 +1402,11 @@
                     friends.forEach(f => {
                         const avatarSrc = f.avatar ? f.avatar : 'https://via.placeholder.com/40/333/fff?text=' + f.name[0];
                         list.innerHTML += `
-                                    <div class="req-item" onclick="openProfile(${f.id})" style="cursor:pointer; justify-content: flex-start; gap: 15px;">
-                                        <img src="${avatarSrc}" class="req-avatar">
-                                        <div style="font-weight:bold;">${f.name}</div>
-                                    </div>
-                                `;
+                                            <div class="req-item" onclick="openProfile(${f.id})" style="cursor:pointer; justify-content: flex-start; gap: 15px;">
+                                                <img src="${avatarSrc}" class="req-avatar">
+                                                <div style="font-weight:bold;">${f.name}</div>
+                                            </div>
+                                        `;
                     });
                 })
                 .catch(() => showToast('Ошибка', 'Не удалось загрузить друзей'));
@@ -1421,20 +1436,20 @@
                     reqs.forEach(req => {
                         const avatarSrc = req.avatar ? req.avatar : 'https://via.placeholder.com/40/333/fff?text=' + req.name[0];
                         list.innerHTML += `
-                                    <div class="req-item" id="req-${req.req_id}">
-                                        <div class="req-info">
-                                            <img src="${avatarSrc}" class="req-avatar">
-                                            <div style="text-align: left;">
-                                                <div style="font-weight:bold;">${req.name}</div>
-                                                <div style="font-size:12px; color:#888;">хочет дружить</div>
+                                            <div class="req-item" id="req-${req.req_id}">
+                                                <div class="req-info">
+                                                    <img src="${avatarSrc}" class="req-avatar">
+                                                    <div style="text-align: left;">
+                                                        <div style="font-weight:bold;">${req.name}</div>
+                                                        <div style="font-size:12px; color:#888;">хочет дружить</div>
+                                                    </div>
+                                                </div>
+                                                <div style="display:flex; gap:5px;">
+                                                    <button class="req-btn req-accept" onclick="handleReq(${req.req_id}, 'accept')">✔</button>
+                                                    <button class="req-btn req-reject" onclick="handleReq(${req.req_id}, 'reject')">✖</button>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div style="display:flex; gap:5px;">
-                                            <button class="req-btn req-accept" onclick="handleReq(${req.req_id}, 'accept')">✔</button>
-                                            <button class="req-btn req-reject" onclick="handleReq(${req.req_id}, 'reject')">✖</button>
-                                        </div>
-                                    </div>
-                                `;
+                                        `;
                     });
                 });
         }
@@ -1514,6 +1529,47 @@
 
         socket.on('reaction_updated', (data) => renderReactions(data.msgId, data.reacts));
 
+        // --- ЛОГИКА ГАЛЕРЕИ ---
+        async function openMediaGallery() {
+            if (!currentChatId) return;
+            const modal = document.getElementById('media-gallery-modal');
+            const grid = document.getElementById('media-gallery-grid');
+            grid.innerHTML = '<div style="grid-column: 1 / -1; color: #888;">Загрузка...</div>';
+            modal.style.display = 'flex';
+
+            try {
+                // Запрашиваем историю чата и фильтруем только фотки
+                const res = await fetch(`/messages?u1=${myId}&u2=${currentChatId}`);
+                const history = await res.json();
+                const photos = history.filter(m => m.type === 'image');
+
+                if (photos.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1 / -1; color: #888; margin-top: 20px;">В чате отсутствуют фото</div>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+                // Разворачиваем, чтобы новые фото были сверху
+                photos.reverse().forEach(msg => {
+                    const img = document.createElement('img');
+                    img.src = msg.text;
+                    img.style.width = '100%';
+                    img.style.height = '100px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '8px';
+                    img.style.cursor = 'pointer';
+                    // При клике на миниатюру - открываем большое фото
+                    img.onclick = () => {
+                        document.getElementById('photo-viewer-img').src = msg.text;
+                        document.getElementById('photo-viewer').style.display = 'flex';
+                    };
+                    grid.appendChild(img);
+                });
+            } catch (e) {
+                grid.innerHTML = '<div style="grid-column: 1 / -1; color: red;">Ошибка загрузки</div>';
+            }
+        }
+    
     </script>
 
     <div id="msg-context-menu">
@@ -1534,6 +1590,19 @@
     <!-- Модалка просмотра фото -->
     <div id="photo-viewer" onclick="this.style.display='none'">
         <img id="photo-viewer-img">
+    </div>
+
+    <!-- Модалка галереи чата -->
+    <div id="media-gallery-modal" class="modal" style="display: none; background: rgba(0,0,0,0.8); z-index: 600;">
+        <div class="auth-box" style="width: 80%; max-width: 600px; height: 80vh; display: flex; flex-direction: column; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin:0;">Фотографии</h2>
+                <span onclick="document.getElementById('media-gallery-modal').style.display='none'" style="cursor:pointer; font-size:1.5em; color:#888;">✖</span>
+            </div>
+            <div id="media-gallery-grid" style="flex-grow: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; align-content: start;">
+                <!-- Сюда грузятся фото -->
+            </div>
+        </div>
     </div>
 
 </body>
